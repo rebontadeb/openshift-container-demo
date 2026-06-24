@@ -273,25 +273,16 @@ CHAPTER 07 — Observability
              -n grafana --timeout=120s
 
 68. chapters/07-observability/manifests/grafana/datasource.yaml
-    (this CR alone leaves the datasource unauthenticated — see Step 7c2 below)
+    (secureJsonData.httpHeaderValue1 uses the ${BEARER_TOKEN} placeholder
+     token + spec.valuesFrom.secretKeyRef — the Operator substitutes it at
+     apply time. Two other approaches were tried and found to be dead ends
+     or non-durable; see the comments in datasource.yaml for why.)
 
-    -- Step 7c2: Patch the real bearer token into the datasource (one-time manual step) --
-    -- Two operator-native mechanisms were tried and don't work for datasources
-    -- created via the API (vs. file-based provisioning): $__env{BEARER_TOKEN}
-    -- in secureJsonData, and spec.valuesFrom. Both confirmed dead ends live —
-    -- see comments in datasource.yaml. PATCHing via Grafana's own API after
-    -- the fact is what actually works: --
-    GRAFANA_POD=$(oc get pod -n grafana -l app=financeflow-grafana -o jsonpath='{.items[0].metadata.name}')
-    DS_UID=$(oc exec -n grafana "$GRAFANA_POD" -c grafana -- curl -s -u admin:financeflow \
-      "http://localhost:3000/api/datasources" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['uid'])")
-    TOKEN_RAW=$(oc get secret grafana-thanos-bearer-token -n grafana -o jsonpath='{.data.BEARER_TOKEN}' | base64 -d)
-    oc exec -n grafana "$GRAFANA_POD" -c grafana -- curl -s -u admin:financeflow \
-      -X PUT "http://localhost:3000/api/datasources/uid/$DS_UID" \
-      -H "Content-Type: application/json" \
-      -d "{\"name\":\"Prometheus\",\"type\":\"prometheus\",\"access\":\"proxy\",\"isDefault\":true,\"url\":\"https://thanos-querier.openshift-monitoring.svc.cluster.local:9091\",\"jsonData\":{\"httpMethod\":\"POST\",\"httpHeaderName1\":\"Authorization\",\"tlsSkipVerify\":true},\"secureJsonData\":{\"httpHeaderValue1\":\"$TOKEN_RAW\"}}"
-
-    >> Verify: oc exec -n grafana "$GRAFANA_POD" -c grafana -- curl -s -u admin:financeflow \
-               "http://localhost:3000/api/datasources/uid/$DS_UID/health"
+    >> Verify: GRAFANA_POD=$(oc get pod -n grafana -l app=financeflow-grafana -o jsonpath='{.items[0].metadata.name}')
+    >>         DS_UID=$(oc exec -n grafana "$GRAFANA_POD" -c grafana -- curl -s -u admin:financeflow \
+    >>           "http://localhost:3000/api/datasources" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['uid'])")
+    >>         oc exec -n grafana "$GRAFANA_POD" -c grafana -- curl -s -u admin:financeflow \
+    >>           "http://localhost:3000/api/datasources/uid/$DS_UID/health"
     >>         (expect status: "OK", "Successfully queried the Prometheus API")
 
 69. chapters/07-observability/manifests/grafana/route.yaml

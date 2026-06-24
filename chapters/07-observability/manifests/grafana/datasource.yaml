@@ -18,23 +18,21 @@ spec:
       httpHeaderName1: Authorization
       tlsSkipVerify: true
     secureJsonData:
-      httpHeaderValue1: "REPLACE_ME_VIA_API_PATCH_BELOW"
-  # IMPORTANT: this CR alone is NOT enough — the real bearer token has to be
-  # patched in imperatively after applying (same convention as
-  # postgres-credentials / github-webhook-secret: never commit a real
-  # secret value to a YAML file).
-  #
-  # Two templating mechanisms were tried and ruled out (both confirmed live):
-  #   1. Grafana's native $__env{BEARER_TOKEN} provisioning-file syntax —
-  #      doesn't get expanded for datasources this Operator creates via the
-  #      HTTP API rather than a file on disk, even with the env var
-  #      correctly present in the pod (verified with `oc exec ... env`).
-  #   2. spec.valuesFrom (this Operator's own secret-injection field,
-  #      confirmed to exist via `oc explain grafanadatasource.spec.valuesFrom`)
-  #      — produced zero log activity in the operator about resolving the
-  #      secret despite correct RBAC, and the datasource kept failing with
-  #      401. Whatever this field expects, it isn't what's documented here.
-  #
-  # What's confirmed to work: PATCHing secureJsonData directly via Grafana's
-  # own API after the datasource exists — see the imperative step in
-  # chapters/07-observability/lab/07-observability.md / chapters/apply-order.txt.
+      # ${BEARER_TOKEN} is a literal placeholder token, not a typo — the
+      # Operator's valuesFrom (below) does a string substitution looking for
+      # exactly this ${KEY} pattern inside the field value. Earlier attempts
+      # put a plain string here instead ("REPLACE_ME...") — with no ${...}
+      # pattern to find, valuesFrom had nothing to substitute and silently
+      # left it untouched (no error, no log — just a permanently-wrong
+      # value). Confirmed via grafana.github.io/grafana-operator's own
+      # datasource example. The PATCH-via-API approach used previously
+      # wasn't durable either: the Operator periodically reconciles this CR
+      # against the live Grafana instance and overwrites any out-of-band
+      # change with whatever's declared here.
+      httpHeaderValue1: "${BEARER_TOKEN}"
+  valuesFrom:
+    - targetPath: "secureJsonData.httpHeaderValue1"
+      valueFrom:
+        secretKeyRef:
+          name: grafana-thanos-bearer-token
+          key: BEARER_TOKEN

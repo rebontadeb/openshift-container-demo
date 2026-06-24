@@ -372,7 +372,7 @@ Click that span — examine the tags for `db.statement`, `http.url`, and any cus
 
 ### Step 0 — Install the Grafana Operator and wire up the datasource
 
-Full commands are in `chapters/apply-order.txt` (Steps 7b/7c/7c2) — summary:
+Full commands are in `chapters/apply-order.txt` (Steps 7b/7c) — summary:
 
 ```bash
 # Operator (cluster-admin)
@@ -395,13 +395,18 @@ oc apply -f chapters/07-observability/manifests/grafana/datasource.yaml
 oc apply -f chapters/07-observability/manifests/grafana/route.yaml
 ```
 
-> **The datasource CR alone won't authenticate.** Two operator-native ways to
-> inject the bearer token were tried and don't work for datasources created
-> via Grafana's API (as this Operator does) rather than file-based
-> provisioning: `$__env{BEARER_TOKEN}` in `secureJsonData`, and
-> `spec.valuesFrom`. Both confirmed dead ends — see the comments in
-> `datasource.yaml`. PATCH it in directly via Grafana's own API instead
-> (`chapters/apply-order.txt` Step 7c2 has the exact command), then verify:
+> **Getting the bearer token into the datasource was trickier than it looks.**
+> `datasource.yaml` uses `secureJsonData.httpHeaderValue1: "${BEARER_TOKEN}"`
+> together with `spec.valuesFrom.secretKeyRef` — the Operator substitutes
+> the `${BEARER_TOKEN}` placeholder with the Secret's value at apply time.
+> That `${...}` token is load-bearing, not decoration: an earlier version of
+> this file had a plain string there instead, which silently never got
+> substituted (no error, no log — `valuesFrom` just had no `${...}` pattern
+> to act on). A PATCH-via-API workaround "fixed" it temporarily, but wasn't
+> durable: the Operator periodically reconciles this CR against the live
+> Grafana instance and overwrites any out-of-band change with whatever's
+> declared here — so the workaround silently broke again later. Verify it's
+> actually working:
 > ```bash
 > GRAFANA_POD=$(oc get pod -n grafana -l app=financeflow-grafana -o jsonpath='{.items[0].metadata.name}')
 > DS_UID=$(oc exec -n grafana "$GRAFANA_POD" -c grafana -- curl -s -u admin:financeflow \

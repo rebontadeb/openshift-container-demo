@@ -315,18 +315,10 @@ oc wait --for=condition=GrafanaReady grafana/financeflow-grafana -n grafana --ti
 step "Apply the Grafana datasource CR"
 oc apply -f 07-observability/manifests/grafana/datasource.yaml
 
-step "Patch the real bearer token into the datasource via Grafana's API"
-# $__env{} templating and spec.valuesFrom both don't work for datasources
-# created via Grafana's HTTP API (confirmed live) — PATCHing it in directly
-# after the fact is what actually works. See datasource.yaml's comments.
+step "Verify the datasource authenticates (secureJsonData uses \${BEARER_TOKEN} + spec.valuesFrom — no manual patch needed)"
 GRAFANA_POD=$(oc get pod -n grafana -l app=financeflow-grafana -o jsonpath='{.items[0].metadata.name}')
 DS_UID=$(oc exec -n grafana "$GRAFANA_POD" -c grafana -- curl -s -u admin:financeflow \
   "http://localhost:3000/api/datasources" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['uid'])")
-TOKEN_RAW=$(oc get secret grafana-thanos-bearer-token -n grafana -o jsonpath='{.data.BEARER_TOKEN}' | base64 -d)
-oc exec -n grafana "$GRAFANA_POD" -c grafana -- curl -s -u admin:financeflow \
-  -X PUT "http://localhost:3000/api/datasources/uid/$DS_UID" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\":\"Prometheus\",\"type\":\"prometheus\",\"access\":\"proxy\",\"isDefault\":true,\"url\":\"https://thanos-querier.openshift-monitoring.svc.cluster.local:9091\",\"jsonData\":{\"httpMethod\":\"POST\",\"httpHeaderName1\":\"Authorization\",\"tlsSkipVerify\":true},\"secureJsonData\":{\"httpHeaderValue1\":\"$TOKEN_RAW\"}}" >/dev/null
 oc exec -n grafana "$GRAFANA_POD" -c grafana -- curl -s -u admin:financeflow \
   "http://localhost:3000/api/datasources/uid/$DS_UID/health"
 echo
