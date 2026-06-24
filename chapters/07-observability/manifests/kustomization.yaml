@@ -13,6 +13,7 @@ kind: Kustomization
 resources:
   - tempo.yaml
   - peerauthentication-tempo-ingress-permissive.yaml
+  - networkpolicy-allow-collector-to-tempo.yaml
   - otel-collector.yaml
   - servicemonitor-account-service.yaml
   - servicemonitor-transaction-service.yaml

@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-collector-to-tempo
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: financeflow
+      app.kubernetes.io/managed-by: tempo-operator
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # The OTel Collector (otel-collector.yaml) — Tempo's pods carry
+        # operator-managed app.kubernetes.io/* labels, not app: financeflow,
+        # so Chapter 3's deny-all-ingress blocks the Collector's OTLP export
+        # with no other rule picking up the slack. Manifests as the
+        # Collector's otlp/tempo exporter permanently retrying with
+        # "context deadline exceeded" — packets silently dropped, not an
+        # explicit rejection, which is the NetworkPolicy-drop signature.
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: opentelemetry-collector
+      ports:
+        - protocol: TCP
+          port: 4317   # OTLP gRPC
+        - protocol: TCP
+          port: 4318   # OTLP HTTP
