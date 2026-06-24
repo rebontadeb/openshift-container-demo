@@ -31,6 +31,6 @@ spec:
   # spec.taskRunTemplate.serviceAccountName. The old top-level field is
   # silently pruned by the CRD schema — no error, it just falls back to the
   # namespace's default "pipeline" SA, which has none of financeflow-cicd's
-  # registry-editor/privileged-SCC/git-credentials grants.
+  # pipelines-scc/registry-editor/git-credentials grants.
   taskRunTemplate:
     serviceAccountName: financeflow-cicd    # from Chapter 4 — has deploy permissions

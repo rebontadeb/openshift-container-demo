@@ -105,8 +105,14 @@ oc adm policy add-role-to-user \
   registry-editor \
   system:serviceaccount:financeflow-workshop:financeflow-cicd
 
-# Allow buildah to use the privileged SCC (needed for container builds)
-oc adm policy add-scc-to-user privileged \
+# Allow buildah to run — pipelines-scc (not privileged!) is purpose-built by
+# the Tekton operator for this: RunAsAny on UID (catalog Tasks like git-clone
+# hardcode their own non-root UID) but fsGroup: MustRunAs, so it auto-derives
+# a writable group for the shared pipeline-source PVC from THIS namespace's
+# allocated range — unlike privileged (fsGroup: RunAsAny), which assigns
+# nothing and forces you into hardcoding a GID that breaks the moment this
+# namespace is ever deleted/recreated with a different allocated range.
+oc adm policy add-scc-to-user pipelines-scc \
   -z financeflow-cicd \
   -n financeflow-workshop
 ```
@@ -416,9 +422,10 @@ oc get route financeflow-webhook
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
-| PipelineRun stuck in `Pending` | `financeflow-cicd` SA lacks permissions | Add `registry-editor` and `privileged` SCC |
-| `buildah` step fails with permission error | Rootless buildah needs privileged SCC | `oc adm policy add-scc-to-user privileged -z financeflow-cicd` |
+| PipelineRun stuck in `Pending` | `financeflow-cicd` SA lacks permissions | Add `registry-editor` and `pipelines-scc` |
+| `buildah` step fails with permission error | SA needs pipelines-scc | `oc adm policy add-scc-to-user pipelines-scc -z financeflow-cicd` |
 | `git-clone` fails: auth error | Private repo without credentials | Add a `basic-auth` or `ssh-auth` workspace secret |
+| `git-clone`/`update-manifest` fails: `Permission denied` writing to the shared workspace | SA's SCC has `fsGroup: RunAsAny` (e.g. `privileged`) — nothing assigns a writable group to the PVC, so whichever Task's hardcoded UID touches it first "owns" it | Use `pipelines-scc` (`fsGroup: MustRunAs`) instead of `privileged`; don't hardcode an `fsGroup` value in `podTemplate.securityContext` — it won't survive the namespace being recreated |
 | ArgoCD shows `Unknown` sync | Repo URL mismatch or network issue | Check `argocd-project.yaml` sourceRepos field |
 | Webhook returns `400` | HMAC mismatch | Secret in GitHub and `github-webhook-secret` must match |
 | EventListener pod crashes | SA missing Tekton trigger permissions | `oc get events -n financeflow-workshop` |
