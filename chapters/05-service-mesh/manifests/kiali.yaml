@@ -26,12 +26,12 @@ spec:
           use_kiali_token: true
     grafana:
       enabled: true
-      # Replace with this cluster's actual Grafana route once Chapter 7 creates
-      # it (`oc get route -n grafana`) — every workshop cluster gets a
-      # different *.apps.<cluster-id>.<domain> hostname, so this can never be
-      # hardcoded to one specific cluster (e.g. a leftover cluster-8c992 host
-      # from a prior run would silently 404 on any other cluster).
-      url: https://<REPLACE_WITH_GRAFANA_ROUTE_HOST>
+      # This cluster's actual Grafana route, created in Chapter 7
+      # (`oc get route grafana -n grafana`). Every workshop cluster gets a
+      # different *.apps.<cluster-id>.<domain> hostname — re-check and update
+      # this after Chapter 7 on any other cluster; never copy this value
+      # forward (a leftover host from a prior cluster would silently 404).
+      url: https://grafana-grafana.apps.cluster-mxqd5.dynamic2.redhatworkshops.io
       in_cluster_url: http://financeflow-grafana-service.grafana.svc.cluster.local:3000
       auth:
         type: basic
