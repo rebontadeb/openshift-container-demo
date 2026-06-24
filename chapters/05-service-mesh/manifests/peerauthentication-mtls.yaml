@@ -18,3 +18,28 @@ spec:
       tier: portal
   mtls:
     mode: PERMISSIVE
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: app-metrics-port-permissive
+  namespace: financeflow-workshop
+spec:
+  # portLevelMtls requires a selector — can't be added to the namespace-wide
+  # financeflow-mtls policy above, hence this separate workload-scoped one.
+  # Port 8080 is every app's own HTTP port (account-service, transaction-
+  # service, portal all use it) — Chapter 7's ServiceMonitors scrape /metrics
+  # on it directly from openshift-user-workload-monitoring's Prometheus,
+  # which is outside the mesh and speaks plain HTTP. Under blanket STRICT,
+  # the sidecar rejects that scrape with no log on either side — `up` just
+  # reports 0 forever, easy to mistake for an app-level metrics bug. 15090
+  # (Envoy's own stats port, used by the Chapter 5 istio-sidecar-metrics
+  # PodMonitor) is unaffected since Envoy serves it directly, unproxied.
+  selector:
+    matchLabels:
+      app: financeflow
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    "8080":
+      mode: PERMISSIVE
