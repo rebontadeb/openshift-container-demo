@@ -78,6 +78,23 @@ oc get csv -n openshift-operators | grep gitops
 oc get pods -n openshift-gitops
 ```
 
+### Step 2b — Enable the GitOps console plugin
+
+Same gap as the Pipelines operator (Step 1b): the operator installs the
+`gitops-plugin` pod but doesn't enable it in the Console config — without
+this, ArgoCD applications show nothing in the OpenShift console even though
+`oc get application -n openshift-gitops` reports `Synced`/`Healthy` fine.
+
+```bash
+oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}'
+# if "gitops-plugin" is missing from that list:
+oc patch console.operator.openshift.io cluster --type=json \
+  -p '[{"op": "add", "path": "/spec/plugins/-", "value": "gitops-plugin"}]'
+
+# wait for the console pod to roll out, then hard-refresh your browser
+oc get pods -n openshift-console
+```
+
 ### Step 3 — Get the ArgoCD admin password
 
 ```bash

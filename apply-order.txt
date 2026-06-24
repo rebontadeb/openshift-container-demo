@@ -164,6 +164,12 @@ CHAPTER 06 — CI/CD
     oc patch console.operator.openshift.io cluster --type=json \
       -p '[{"op": "add", "path": "/spec/plugins/-", "value": "pipelines-console-plugin"}]'
 
+    -- Enable the GitOps console plugin too (same gap, same fix) --
+    -- Without this, ArgoCD shows nothing in the OpenShift console even
+    -- though `oc get application -n openshift-gitops` shows it Synced/Healthy --
+    oc patch console.operator.openshift.io cluster --type=json \
+      -p '[{"op": "add", "path": "/spec/plugins/-", "value": "gitops-plugin"}]'
+
     -- Create the GitHub webhook Secret imperatively --
     oc create secret generic github-webhook-secret \
       --from-literal=secret=$(openssl rand -hex 20)
