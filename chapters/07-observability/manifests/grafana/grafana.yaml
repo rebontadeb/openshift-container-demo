@@ -27,10 +27,13 @@ spec:
               # for why ($__env{} templating and spec.valuesFrom were both
               # tried and ruled out). The real token is PATCHed into the
               # datasource directly via Grafana's API instead.
+              # 256Mi was too low — confirmed live, container hit OOMKilled
+              # (exit code 137) repeatedly under normal operation, not just
+              # under load.
               resources:
                 requests:
                   cpu: 100m
-                  memory: 128Mi
+                  memory: 256Mi
                 limits:
                   cpu: 500m
-                  memory: 256Mi
+                  memory: 512Mi
