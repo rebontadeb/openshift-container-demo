@@ -34,3 +34,12 @@ spec:
       kind: Deployment
       jsonPointers:
         - /spec/replicas
+    # Ignore the container image — OpenShift's ImageStream lookupPolicy
+    # (local: true) resolves the friendly tag (e.g. financeflow-account:v1.0)
+    # to a pinned @sha256:... digest live, on every apply. Without this,
+    # every Deployment using an ImageStream-backed image shows permanently
+    # OutOfSync, since OpenShift keeps rewriting the field git doesn't have.
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
