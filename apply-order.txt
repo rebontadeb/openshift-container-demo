@@ -269,11 +269,16 @@ CHAPTER 07 — Observability
     >> Wait: oc get pods -l app.kubernetes.io/managed-by=tempo-operator
     >> Wait: oc get route tempo-financeflow-jaegerui
 
-75. chapters/07-observability/manifests/otel-collector.yaml
-76. chapters/07-observability/manifests/servicemonitor-otel-collector.yaml
+75. chapters/07-observability/manifests/peerauthentication-tempo-ingress-permissive.yaml
+    (Tempo's pods aren't covered by Chapter 5's portal/app mTLS exceptions —
+     without this, the jaegerui Route 503s, since the router is outside the
+     mesh and STRICT mTLS rejects its plaintext connection to oauth-proxy)
+
+76. chapters/07-observability/manifests/otel-collector.yaml
+77. chapters/07-observability/manifests/servicemonitor-otel-collector.yaml
 
     -- Step 7g: Trace generation (Lab 7c — instrument app.py with the OTel SDK first) --
-77. chapters/07-observability/manifests/grafana-dashboard-configmap.yaml
+78. chapters/07-observability/manifests/grafana-dashboard-configmap.yaml
 
 
 ========================================

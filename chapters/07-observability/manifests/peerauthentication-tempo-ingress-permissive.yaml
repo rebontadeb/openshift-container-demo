@@ -1,0 +1,22 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: tempo-ingress-permissive
+  namespace: financeflow-workshop
+spec:
+  # Same pattern as portal-ingress-permissive (Chapter 5) and
+  # webhook-ingress-permissive (Chapter 6) — the namespace-wide
+  # financeflow-mtls policy is STRICT, but the OpenShift router (which
+  # forwards the tempo-financeflow-jaegerui Route) is outside the mesh and
+  # speaks plain HTTP to the oauth-proxy container's port 8443. Without this
+  # override, the Route returns 503 with no application-level log.
+  #
+  # Tempo's pods don't carry app: financeflow (they're operator-managed —
+  # see app.kubernetes.io/* labels instead), so neither of the two existing
+  # PeerAuthentication exceptions in Chapter 5 cover them.
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: financeflow
+      app.kubernetes.io/managed-by: tempo-operator
+  mtls:
+    mode: PERMISSIVE

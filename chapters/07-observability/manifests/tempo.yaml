@@ -16,11 +16,15 @@ spec:
       size: 2Gi
   jaegerui:
     enabled: true
+    # NOTE: there is no top-level spec.route on TempoMonolithic — that field
+    # doesn't exist in the CRD and gets silently dropped (no validation
+    # error), so the Route never gets created despite jaegerui.enabled: true
+    # working fine on its own. Route config is nested under jaegerui instead.
+    route:
+      enabled: true
   ingestion:
     otlp:
       grpc:
         enabled: true
       http:
         enabled: true
-  route:
-    enabled: true

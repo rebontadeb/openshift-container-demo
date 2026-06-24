@@ -12,6 +12,7 @@ kind: Kustomization
 #      same metrics pipeline, so it's set up there, not here)
 resources:
   - tempo.yaml
+  - peerauthentication-tempo-ingress-permissive.yaml
   - otel-collector.yaml
   - servicemonitor-account-service.yaml
   - servicemonitor-transaction-service.yaml
