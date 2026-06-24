@@ -17,16 +17,37 @@ spec:
       org_role: Viewer
     server:
       root_url: "%(protocol)s://%(domain)s/"
+  # Without this, Grafana's SQLite database (every datasource/dashboard
+  # registration, including their internal UIDs) lives in an ephemeral
+  # emptyDir tied to the pod's lifecycle. Confirmed live: every pod restart
+  # (an OOM kill, a routine rollout, anything) wiped it clean, the Operator
+  # re-created the datasource fresh from its CR, and Grafana assigned it a
+  # brand new UID each time — auth worked immediately every time (that part
+  # was genuinely fixed), but any bookmarked dashboard URL referencing the
+  # previous UID would then silently show "no data". Four different UIDs
+  # over a few hours of normal operation before this was added.
+  persistentVolumeClaim:
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
   deployment:
     spec:
       template:
         spec:
+          # spec.persistentVolumeClaim above only creates the PVC object —
+          # confirmed live, it does NOT automatically wire it into the
+          # Deployment's volume mounts. The "grafana-data" volume stayed
+          # emptyDir even with the PVC created and Bound until this explicit
+          # override was added (matched by volume name).
+          volumes:
+            - name: grafana-data
+              persistentVolumeClaim:
+                claimName: financeflow-grafana-pvc
           containers:
             - name: grafana
-              # No envFrom/BEARER_TOKEN here — see datasource.yaml's comments
-              # for why ($__env{} templating and spec.valuesFrom were both
-              # tried and ruled out). The real token is PATCHed into the
-              # datasource directly via Grafana's API instead.
               # 256Mi was too low — confirmed live, container hit OOMKilled
               # (exit code 137) repeatedly under normal operation, not just
               # under load. 512Mi still wasn't enough headroom: a freshly
