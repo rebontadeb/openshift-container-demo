@@ -10,10 +10,44 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s %(message)s')
 log = logging.getLogger(__name__)
 
+# ─── OpenTelemetry Tracing ──────────────────────────────────────────────────────
+
+SERVICE_NAME_VALUE = os.environ.get("OTEL_SERVICE_NAME", "transaction-service")
+OTEL_ENDPOINT      = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+
+if OTEL_ENDPOINT:
+    resource = Resource.create({SERVICE_NAME: SERVICE_NAME_VALUE})
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(
+        BatchSpanProcessor(
+            OTLPSpanExporter(
+                endpoint=OTEL_ENDPOINT,
+                insecure=True,    # collector uses plain gRPC inside the cluster
+            )
+        )
+    )
+    trace.set_tracer_provider(provider)
+
+tracer = trace.get_tracer(SERVICE_NAME_VALUE)
+
 app = Flask(__name__)
+
+if OTEL_ENDPOINT:
+    FlaskInstrumentor().instrument_app(app)
+    SQLAlchemyInstrumentor().instrument()
+    RequestsInstrumentor().instrument()
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -175,7 +209,11 @@ def transfer():
     if from_id == to_id:
         abort(400, description="Source and destination accounts must differ")
 
-    with TRANSFER_LATENCY.labels(transaction_type="transfer").time():
+    with TRANSFER_LATENCY.labels(transaction_type="transfer").time(), \
+         tracer.start_as_current_span("process-transfer") as span:
+        span.set_attribute("transfer.from_account_id", from_id)
+        span.set_attribute("transfer.to_account_id", to_id)
+        span.set_attribute("transfer.amount", amount)
         try:
             # Validate source balance via account-service
             balance = _get_balance(from_id)

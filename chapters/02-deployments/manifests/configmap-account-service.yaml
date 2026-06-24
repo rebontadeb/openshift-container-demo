@@ -11,3 +11,6 @@ data:
   DB_PORT: "5432"
   DB_NAME: financeflow
   PORT:    "8080"
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://financeflow-collector:4317
+  OTEL_SERVICE_NAME:           account-service
+  OTEL_PROPAGATORS:            tracecontext,baggage

@@ -12,3 +12,6 @@ data:
   DB_NAME:             financeflow
   ACCOUNT_SERVICE_URL: http://account-service:8080   # inter-service call
   PORT:                "8080"
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://financeflow-collector:4317
+  OTEL_SERVICE_NAME:           transaction-service
+  OTEL_PROPAGATORS:            tracecontext,baggage

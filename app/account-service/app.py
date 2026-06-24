@@ -9,10 +9,42 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s %(message)s')
 log = logging.getLogger(__name__)
 
+# ─── OpenTelemetry Tracing ──────────────────────────────────────────────────────
+
+SERVICE_NAME_VALUE = os.environ.get("OTEL_SERVICE_NAME", "account-service")
+OTEL_ENDPOINT      = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+
+if OTEL_ENDPOINT:
+    resource = Resource.create({SERVICE_NAME: SERVICE_NAME_VALUE})
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(
+        BatchSpanProcessor(
+            OTLPSpanExporter(
+                endpoint=OTEL_ENDPOINT,
+                insecure=True,    # collector uses plain gRPC inside the cluster
+            )
+        )
+    )
+    trace.set_tracer_provider(provider)
+
+tracer = trace.get_tracer(SERVICE_NAME_VALUE)
+
 app = Flask(__name__)
+
+if OTEL_ENDPOINT:
+    FlaskInstrumentor().instrument_app(app)
+    SQLAlchemyInstrumentor().instrument()
 
 # ─── Database ─────────────────────────────────────────────────────────────────
 
@@ -180,9 +212,13 @@ def update_balance(account_id):
     if delta is None:
         abort(400, description="Field 'delta' is required")
 
-    new_balance = float(account.balance) + float(delta)
-    if new_balance < 0:
-        abort(422, description="Insufficient funds")
+    with tracer.start_as_current_span("validate-account-balance") as span:
+        span.set_attribute("account.id", str(account_id))
+        span.set_attribute("account.balance", float(account.balance))
+        span.set_attribute("account.delta", float(delta))
+        new_balance = float(account.balance) + float(delta)
+        if new_balance < 0:
+            abort(422, description="Insufficient funds")
 
     account.balance = new_balance
     db.session.commit()
