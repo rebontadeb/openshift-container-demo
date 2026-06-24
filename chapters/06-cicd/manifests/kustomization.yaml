@@ -17,6 +17,7 @@ kind: Kustomization
 # ArgoCD resources (argocd-project.yaml, argocd-app-financeflow.yaml) go into
 # the openshift-gitops namespace — apply them separately with cluster-admin.
 resources:
+  - namespace-argocd-managed.yaml
   - pvc-pipeline-source.yaml
   - task-run-tests.yaml
   - task-update-manifest.yaml

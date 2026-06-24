@@ -31,6 +31,9 @@ spec:
                          # subset "v1-0" (selects version: v1.0) actually matches
                          # these pods instead of an empty subset
     spec:
+      # Set in Chapter 4 (Lab 4, Step 3) — committed here so Chapter 6's
+      # ArgoCD selfHeal doesn't revert it back to the default SA on next sync
+      serviceAccountName: financeflow-app
       containers:
         - name: account-service
           image: financeflow-account:v1.0    # resolved via ImageStream lookupPolicy

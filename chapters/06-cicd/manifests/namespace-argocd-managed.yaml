@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: financeflow-workshop
+  labels:
+    argocd.argoproj.io/managed-by: openshift-gitops
+    # Without this label, the OpenShift GitOps operator never creates the
+    # RoleBinding that grants the argocd-application-controller SA admin
+    # rights in this namespace — every sync of Deployments/Services/HPAs
+    # (anything beyond ConfigMap/PVC, which happen to be reachable by
+    # ArgoCD's own default ClusterRole) fails with "is forbidden: ... cannot
+    # patch resource ... in the namespace financeflow-workshop".

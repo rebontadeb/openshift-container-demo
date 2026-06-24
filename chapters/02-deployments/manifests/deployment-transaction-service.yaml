@@ -26,6 +26,9 @@ spec:
         app: financeflow
         tier: transaction-service
     spec:
+      # Set in Chapter 4 (Lab 4, Step 3) — committed here so Chapter 6's
+      # ArgoCD selfHeal doesn't revert it back to the default SA on next sync
+      serviceAccountName: financeflow-app
       containers:
         - name: transaction-service
           image: financeflow-transaction:v1.0

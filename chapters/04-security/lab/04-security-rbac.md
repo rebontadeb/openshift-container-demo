@@ -59,6 +59,14 @@ oc rollout status deployment/transaction-service
 oc rollout status deployment/portal
 ```
 
+> **If you plan to do Chapter 6 (GitOps):** this `oc patch` only changes the
+> live cluster object, not the committed YAML in
+> `chapters/02-deployments/manifests/`. ArgoCD's `selfHeal: true` (Lab 6d)
+> treats git as the source of truth, so the next sync would silently revert
+> `serviceAccountName` back to `default` and undo this hardening. Add
+> `serviceAccountName: financeflow-app` to each Deployment's `spec.template.spec`
+> in git as well — the manifests in this repo already have it committed.
+
 Verify the change:
 ```bash
 oc get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.serviceAccountName}{"\n"}{end}'

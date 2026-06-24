@@ -169,25 +169,30 @@ CHAPTER 06 — CI/CD
     oc annotate secret git-credentials-cicd tekton.dev/git-0=https://github.com
     oc secrets link financeflow-cicd git-credentials-cicd
 
-48. chapters/06-cicd/manifests/pvc-pipeline-source.yaml
-49. chapters/06-cicd/manifests/task-run-tests.yaml
-50. chapters/06-cicd/manifests/task-update-manifest.yaml
-51. chapters/06-cicd/manifests/pipeline-financeflow.yaml
-52. chapters/06-cicd/manifests/triggerbinding-github.yaml
-53. chapters/06-cicd/manifests/triggertemplate-financeflow.yaml
-54. chapters/06-cicd/manifests/eventlistener.yaml
-55. chapters/06-cicd/manifests/route-eventlistener.yaml
+48. chapters/06-cicd/manifests/namespace-argocd-managed.yaml
+    (labels financeflow-workshop argocd.argoproj.io/managed-by: openshift-gitops
+     — without this, the GitOps operator never creates the RoleBinding that
+     lets ArgoCD's application-controller manage Deployments/Services/HPAs
+     here; sync fails with "is forbidden: ... cannot patch resource ...")
+49. chapters/06-cicd/manifests/pvc-pipeline-source.yaml
+50. chapters/06-cicd/manifests/task-run-tests.yaml
+51. chapters/06-cicd/manifests/task-update-manifest.yaml
+52. chapters/06-cicd/manifests/pipeline-financeflow.yaml
+53. chapters/06-cicd/manifests/triggerbinding-github.yaml
+54. chapters/06-cicd/manifests/triggertemplate-financeflow.yaml
+55. chapters/06-cicd/manifests/eventlistener.yaml
+56. chapters/06-cicd/manifests/route-eventlistener.yaml
 
     -- ArgoCD (apply after the OpenShift GitOps operator is ready) --
-56. chapters/06-cicd/manifests/argocd-project.yaml
+57. chapters/06-cicd/manifests/argocd-project.yaml
     (apply into openshift-gitops: oc apply -f ... -n openshift-gitops)
-57. chapters/06-cicd/manifests/argocd-app-financeflow.yaml
+58. chapters/06-cicd/manifests/argocd-app-financeflow.yaml
     (apply into openshift-gitops: oc apply -f ... -n openshift-gitops)
 
     -- Trigger a pipeline run manually --
-58. chapters/06-cicd/manifests/pipelinerun-account-service.yaml
+59. chapters/06-cicd/manifests/pipelinerun-account-service.yaml
     (use `oc create -f`, not `oc apply -f` — generateName creates a new object each time)
-59. chapters/06-cicd/manifests/pipelinerun-transaction-service.yaml
+60. chapters/06-cicd/manifests/pipelinerun-transaction-service.yaml
     (use `oc create -f`, not `oc apply -f`)
 
 
@@ -200,10 +205,10 @@ CHAPTER 07 — Observability
     --  set up there now — see Chapter 05 above. Nothing to do here.) --
 
     -- Step 7b: Install Grafana Operator (cluster-admin) --
-60. chapters/07-observability/manifests/grafana/namespace.yaml
-61. chapters/07-observability/manifests/grafana/operatorgroup.yaml
-62. chapters/07-observability/manifests/grafana/subscription.yaml
-63. chapters/07-observability/manifests/grafana/serviceaccount.yaml
+61. chapters/07-observability/manifests/grafana/namespace.yaml
+62. chapters/07-observability/manifests/grafana/operatorgroup.yaml
+63. chapters/07-observability/manifests/grafana/subscription.yaml
+64. chapters/07-observability/manifests/grafana/serviceaccount.yaml
 
     >> Wait: oc wait --for=condition=Ready pods -l control-plane=controller-manager \
              -n grafana --timeout=120s
@@ -215,33 +220,33 @@ CHAPTER 07 — Observability
       -n grafana --dry-run=client -o yaml | oc apply -f -
 
     -- Step 7d: Deploy Grafana instance and dashboards --
-64. chapters/07-observability/manifests/grafana/grafana.yaml
+65. chapters/07-observability/manifests/grafana/grafana.yaml
 
     >> Wait: oc wait --for=condition=GrafanaReady grafana/financeflow-grafana \
              -n grafana --timeout=120s
 
-65. chapters/07-observability/manifests/grafana/datasource.yaml
-66. chapters/07-observability/manifests/grafana/route.yaml
-67. chapters/07-observability/manifests/grafana/dashboard-service-mesh.yaml
+66. chapters/07-observability/manifests/grafana/datasource.yaml
+67. chapters/07-observability/manifests/grafana/route.yaml
+68. chapters/07-observability/manifests/grafana/dashboard-service-mesh.yaml
 
     -- Step 7e: App metrics and alerting --
-68. chapters/07-observability/manifests/servicemonitor-account-service.yaml
-69. chapters/07-observability/manifests/servicemonitor-transaction-service.yaml
+69. chapters/07-observability/manifests/servicemonitor-account-service.yaml
+70. chapters/07-observability/manifests/servicemonitor-transaction-service.yaml
     (istio-sidecar-metrics PodMonitor was applied in Chapter 5, step 47 — not repeated here)
-70. chapters/07-observability/manifests/prometheusrule-financeflow.yaml
+71. chapters/07-observability/manifests/prometheusrule-financeflow.yaml
 
     -- Step 7f: Tempo + OpenTelemetry (requires Tempo Operator [Ch.5] and OTel Operator) --
-71. chapters/07-observability/manifests/tempo.yaml
+72. chapters/07-observability/manifests/tempo.yaml
     (TempoMonolithic — deploy before the Collector, which sends traces here)
 
     >> Wait: oc get pods -l app.kubernetes.io/managed-by=tempo-operator
     >> Wait: oc get route tempo-financeflow-jaegerui
 
-72. chapters/07-observability/manifests/otel-collector.yaml
-73. chapters/07-observability/manifests/servicemonitor-otel-collector.yaml
+73. chapters/07-observability/manifests/otel-collector.yaml
+74. chapters/07-observability/manifests/servicemonitor-otel-collector.yaml
 
     -- Step 7g: Trace generation (Lab 7c — instrument app.py with the OTel SDK first) --
-74. chapters/07-observability/manifests/grafana-dashboard-configmap.yaml
+75. chapters/07-observability/manifests/grafana-dashboard-configmap.yaml
 
 
 ========================================

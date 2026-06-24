@@ -23,6 +23,9 @@ spec:
         app: financeflow
         tier: portal
     spec:
+      # Set in Chapter 4 (Lab 4, Step 3) — committed here so Chapter 6's
+      # ArgoCD selfHeal doesn't revert it back to the default SA on next sync
+      serviceAccountName: financeflow-app
       containers:
         - name: portal
           image: financeflow-portal:v1.0
