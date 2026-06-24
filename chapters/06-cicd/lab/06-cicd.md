@@ -98,8 +98,7 @@ oc get pods -n openshift-console
 ### Step 3 — Get the ArgoCD admin password
 
 ```bash
-oc get secret openshift-gitops-cluster -n openshift-gitops \
-  -o jsonpath='{.data.admin\.password}' | base64 -d && echo
+oc extract secret/openshift-gitops-cluster -n openshift-gitops --to=- --keys=admin.password
 
 # Get the ArgoCD URL
 oc get route openshift-gitops-server -n openshift-gitops \
@@ -107,6 +106,18 @@ oc get route openshift-gitops-server -n openshift-gitops \
 ```
 
 Log in to the ArgoCD UI with `admin` and the password above.
+
+> **Logging in via OpenShift SSO instead shows no applications?** ArgoCD's own
+> RBAC (`argocd-rbac-cm`, separate from Kubernetes RBAC) only grants
+> `role:admin` to users in the `cluster-admins`/`system:cluster-admins`
+> *groups* by default. If your OpenShift user has `cluster-admin` via a direct
+> `ClusterRoleBinding` rather than group membership (check with
+> `oc get clusterrolebinding -o json | jq` for your username, and
+> `oc get user <name> -o jsonpath='{.groups}'`), ArgoCD's SSO session falls
+> back to its empty default policy — no access, no error, just an empty
+> Applications list. Logging in as the local `admin` user above bypasses this
+> entirely (it's a superuser), which is the quickest way to confirm it's an
+> RBAC issue and not a broken Application.
 
 ---
 
