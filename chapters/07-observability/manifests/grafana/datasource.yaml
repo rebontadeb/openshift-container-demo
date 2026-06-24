@@ -37,4 +37,4 @@ spec:
   #
   # What's confirmed to work: PATCHing secureJsonData directly via Grafana's
   # own API after the datasource exists — see the imperative step in
-  # chapters/07-observability/lab/07-observability.md / apply-order.txt.
+  # chapters/07-observability/lab/07-observability.md / chapters/apply-order.txt.

@@ -372,7 +372,7 @@ Click that span — examine the tags for `db.statement`, `http.url`, and any cus
 
 ### Step 0 — Install the Grafana Operator and wire up the datasource
 
-Full commands are in `apply-order.txt` (Steps 7b/7c/7c2) — summary:
+Full commands are in `chapters/apply-order.txt` (Steps 7b/7c/7c2) — summary:
 
 ```bash
 # Operator (cluster-admin)
@@ -401,7 +401,7 @@ oc apply -f chapters/07-observability/manifests/grafana/route.yaml
 > provisioning: `$__env{BEARER_TOKEN}` in `secureJsonData`, and
 > `spec.valuesFrom`. Both confirmed dead ends — see the comments in
 > `datasource.yaml`. PATCH it in directly via Grafana's own API instead
-> (`apply-order.txt` Step 7c2 has the exact command), then verify:
+> (`chapters/apply-order.txt` Step 7c2 has the exact command), then verify:
 > ```bash
 > GRAFANA_POD=$(oc get pod -n grafana -l app=financeflow-grafana -o jsonpath='{.items[0].metadata.name}')
 > DS_UID=$(oc exec -n grafana "$GRAFANA_POD" -c grafana -- curl -s -u admin:financeflow \
