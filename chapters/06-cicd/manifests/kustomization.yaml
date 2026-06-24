@@ -13,11 +13,13 @@ kind: Kustomization
 #   5. Create git-credentials-cicd imperatively and link it to the financeflow-cicd
 #      ServiceAccount (see secret-git-credentials.yaml comments) — needed by the
 #      update-manifest Task's git push step
+#   6. Label the namespace for ArgoCD (never `oc apply -f` namespace-argocd-managed.yaml
+#      — see its comments for why):
+#      oc label namespace financeflow-workshop argocd.argoproj.io/managed-by=openshift-gitops
 #
 # ArgoCD resources (argocd-project.yaml, argocd-app-financeflow.yaml) go into
 # the openshift-gitops namespace — apply them separately with cluster-admin.
 resources:
-  - namespace-argocd-managed.yaml
   - pvc-pipeline-source.yaml
   - task-run-tests.yaml
   - task-update-manifest.yaml

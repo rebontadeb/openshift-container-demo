@@ -199,7 +199,30 @@ sed -i 's|https://github.com/[^/]*/[^"]*\.git|https://github.com/<your-org>/<you
   chapters/06-cicd/manifests/argocd-app-financeflow.yaml
 ```
 
-### Step 3 — Create the ArgoCD AppProject and Application
+### Step 3 — Let ArgoCD manage the namespace
+
+The GitOps operator only creates the RoleBinding that lets ArgoCD's
+application-controller manage resources in `financeflow-workshop` if the
+namespace carries this label:
+
+```bash
+oc label namespace financeflow-workshop argocd.argoproj.io/managed-by=openshift-gitops
+```
+
+> **Do not** `oc apply -f chapters/06-cicd/manifests/namespace-argocd-managed.yaml`
+> for this — see the comments in that file. It's a full `Namespace` object, and
+> applying it would overwrite kubectl's `last-applied-configuration` tracking
+> for the *whole* namespace, silently deleting Chapter 5's `istio-injection:
+> enabled` label (kubectl's 3-way merge treats a label missing from the new
+> apply, that was present in the old one, as "remove it"). `oc label` only
+> ever touches the key you name.
+
+Without this step, ArgoCD will sync `ConfigMap`/`PersistentVolumeClaim` fine
+(reachable via its own default ClusterRole) but every `Deployment`/`Service`/
+`HorizontalPodAutoscaler` sync fails with `is forbidden: ... cannot patch
+resource ... in the namespace financeflow-workshop`.
+
+### Step 4 — Create the ArgoCD AppProject and Application
 
 These go into the `openshift-gitops` namespace (ArgoCD's namespace):
 
@@ -211,7 +234,7 @@ oc apply -f chapters/06-cicd/manifests/argocd-app-financeflow.yaml \
   -n openshift-gitops
 ```
 
-### Step 4 — Watch the initial sync
+### Step 5 — Watch the initial sync
 
 In the ArgoCD UI, the `financeflow` application will appear and begin syncing:
 
@@ -231,7 +254,7 @@ oc patch application financeflow -n openshift-gitops \
   --type=merge -p '{"operation":{"sync":{}}}'
 ```
 
-### Step 5 — Test self-healing
+### Step 6 — Test self-healing
 
 Manually scale down the account-service:
 ```bash

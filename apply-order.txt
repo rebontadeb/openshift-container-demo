@@ -169,11 +169,14 @@ CHAPTER 06 — CI/CD
     oc annotate secret git-credentials-cicd tekton.dev/git-0=https://github.com
     oc secrets link financeflow-cicd git-credentials-cicd
 
-48. chapters/06-cicd/manifests/namespace-argocd-managed.yaml
-    (labels financeflow-workshop argocd.argoproj.io/managed-by: openshift-gitops
-     — without this, the GitOps operator never creates the RoleBinding that
-     lets ArgoCD's application-controller manage Deployments/Services/HPAs
-     here; sync fails with "is forbidden: ... cannot patch resource ...")
+    -- Label the namespace for ArgoCD (NEVER `oc apply -f` namespace-argocd-managed.yaml
+    -- as a full object — see its comments: that would wipe Chapter 5's
+    -- istio-injection label via kubectl's last-applied-configuration 3-way merge) --
+    -- Without this label, the GitOps operator never creates the RoleBinding that
+    -- lets ArgoCD's application-controller manage Deployments/Services/HPAs here;
+    -- sync fails with "is forbidden: ... cannot patch resource ..." --
+    oc label namespace financeflow-workshop argocd.argoproj.io/managed-by=openshift-gitops
+
 49. chapters/06-cicd/manifests/pvc-pipeline-source.yaml
 50. chapters/06-cicd/manifests/task-run-tests.yaml
 51. chapters/06-cicd/manifests/task-update-manifest.yaml

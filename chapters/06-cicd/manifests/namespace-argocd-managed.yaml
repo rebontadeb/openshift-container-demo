@@ -1,12 +1,24 @@
+# DO NOT `oc apply -f` this file.
+#
+# Without this label, the OpenShift GitOps operator never creates the
+# RoleBinding that grants the argocd-application-controller SA admin rights in
+# this namespace — every sync of Deployments/Services/HPAs (anything beyond
+# ConfigMap/PVC, which happen to be reachable via ArgoCD's own default
+# ClusterRole) fails with "is forbidden: ... cannot patch resource ... in the
+# namespace financeflow-workshop".
+#
+# This is intentionally NOT applied as a full Namespace object: kubectl's
+# 3-way merge tracks one last-applied-configuration annotation per object —
+# `oc apply -f` this file after Chapter 5's smmr.yaml (which is also a full
+# Namespace apply, for istio-injection: enabled) would silently DELETE that
+# label, breaking sidecar injection with no error. Use a label patch instead,
+# which only touches the key it names:
+#
+#   oc label namespace financeflow-workshop argocd.argoproj.io/managed-by=openshift-gitops
+#
 apiVersion: v1
 kind: Namespace
 metadata:
   name: financeflow-workshop
   labels:
     argocd.argoproj.io/managed-by: openshift-gitops
-    # Without this label, the OpenShift GitOps operator never creates the
-    # RoleBinding that grants the argocd-application-controller SA admin
-    # rights in this namespace — every sync of Deployments/Services/HPAs
-    # (anything beyond ConfigMap/PVC, which happen to be reachable by
-    # ArgoCD's own default ClusterRole) fails with "is forbidden: ... cannot
-    # patch resource ... in the namespace financeflow-workshop".

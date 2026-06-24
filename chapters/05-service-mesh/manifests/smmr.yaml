@@ -4,3 +4,12 @@ metadata:
   name: financeflow-workshop
   labels:
     istio-injection: enabled   # enrolls this namespace in the mesh (OSSM v3 / Sail operator)
+# CAUTION: this is a full Namespace object, applied with `oc apply -f`. kubectl's
+# 3-way merge tracks ONE last-applied-configuration annotation on the live object —
+# applying a *different* Namespace YAML later (e.g. Chapter 6's
+# namespace-argocd-managed.yaml) that doesn't repeat this label will silently
+# DELETE istio-injection from the live namespace, breaking sidecar injection with
+# no error. If you ever need to re-apply this file after Chapter 6 has run, use
+# `oc label namespace financeflow-workshop istio-injection=enabled` instead — never
+# `oc apply -f` two independent partial-label Namespace manifests against the same
+# object.
