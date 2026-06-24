@@ -63,12 +63,19 @@ spec:
                 secretKey: secret
             - name: eventTypes
               value: [push]
-        # Only trigger on pushes to main branch
+        # Only trigger on pushes to main branch — and never on the pipeline's
+        # own commits. Without the second clause, every commit
+        # task-update-manifest.yaml pushes ("ci: update ... [skip ci]") is
+        # itself a push to main, which re-triggers this same EventListener,
+        # which pushes another commit, forever. Confirmed live: one real push
+        # chained into 4 automatic PipelineRuns before being cancelled.
         - ref:
             name: cel
           params:
             - name: filter
-              value: body.ref == 'refs/heads/main'
+              value: >-
+                body.ref == 'refs/heads/main' &&
+                !body.head_commit.message.contains('[skip ci]')
       bindings:
         - ref: github-push-binding
       template:

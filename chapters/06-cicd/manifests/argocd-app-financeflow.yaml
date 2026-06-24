@@ -29,9 +29,15 @@ spec:
 
   # Health checks — ArgoCD uses these to determine sync success
   ignoreDifferences:
-    # Ignore the replicas field — HPA manages this, not git
+    # Ignore the replicas field on account-service ONLY — that's the one
+    # Deployment with an HPA (hpa-account-service.yaml). Scoping by `name`
+    # matters: without it, this rule matched every Deployment in the app,
+    # so committing a replica-count change for portal/transaction-service/
+    # postgres (none of which have an HPA) was silently never synced —
+    # ArgoCD wouldn't even flag it OutOfSync, just permanently ignored it.
     - group: apps
       kind: Deployment
+      name: account-service
       jsonPointers:
         - /spec/replicas
     # Ignore the container image — OpenShift's ImageStream lookupPolicy

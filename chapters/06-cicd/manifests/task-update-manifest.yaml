@@ -75,7 +75,10 @@ spec:
         git add chapters/02-deployments/manifests/deployment-$(params.service).yaml
         git diff --cached --stat
 
-        git commit -m "ci: update $(params.service) image to $(params.image-tag)" || \
+        # [skip ci] is required, not cosmetic — eventlistener.yaml's CEL
+        # filter checks for it specifically to stop this commit from
+        # re-triggering the webhook and looping forever.
+        git commit -m "ci: update $(params.service) image to $(params.image-tag) [skip ci]" || \
           echo "No changes to commit"
 
         # git-clone leaves the workspace in detached HEAD state (normal for
