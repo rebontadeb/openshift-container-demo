@@ -370,6 +370,47 @@ Click that span — examine the tags for `db.statement`, `http.url`, and any cus
 
 ## Lab 7g — Grafana Dashboard
 
+### Step 0 — Install the Grafana Operator and wire up the datasource
+
+Full commands are in `apply-order.txt` (Steps 7b/7c/7c2) — summary:
+
+```bash
+# Operator (cluster-admin)
+oc apply -f chapters/07-observability/manifests/grafana/namespace.yaml
+oc apply -f chapters/07-observability/manifests/grafana/operatorgroup.yaml
+oc apply -f chapters/07-observability/manifests/grafana/subscription.yaml
+oc apply -f chapters/07-observability/manifests/grafana/serviceaccount.yaml
+oc wait --for=condition=Ready pods -l control-plane=controller-manager -n grafana --timeout=120s
+
+# Bearer token for the Thanos datasource
+TOKEN=$(oc create token grafana-sa -n grafana --duration=8760h)
+oc create secret generic grafana-thanos-bearer-token \
+  --from-literal=BEARER_TOKEN="Bearer $TOKEN" \
+  -n grafana --dry-run=client -o yaml | oc apply -f -
+
+# Grafana instance + datasource
+oc apply -f chapters/07-observability/manifests/grafana/grafana.yaml
+oc wait --for=condition=GrafanaReady grafana/financeflow-grafana -n grafana --timeout=120s
+oc apply -f chapters/07-observability/manifests/grafana/datasource.yaml
+oc apply -f chapters/07-observability/manifests/grafana/route.yaml
+```
+
+> **The datasource CR alone won't authenticate.** Two operator-native ways to
+> inject the bearer token were tried and don't work for datasources created
+> via Grafana's API (as this Operator does) rather than file-based
+> provisioning: `$__env{BEARER_TOKEN}` in `secureJsonData`, and
+> `spec.valuesFrom`. Both confirmed dead ends — see the comments in
+> `datasource.yaml`. PATCH it in directly via Grafana's own API instead
+> (`apply-order.txt` Step 7c2 has the exact command), then verify:
+> ```bash
+> GRAFANA_POD=$(oc get pod -n grafana -l app=financeflow-grafana -o jsonpath='{.items[0].metadata.name}')
+> DS_UID=$(oc exec -n grafana "$GRAFANA_POD" -c grafana -- curl -s -u admin:financeflow \
+>   "http://localhost:3000/api/datasources" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['uid'])")
+> oc exec -n grafana "$GRAFANA_POD" -c grafana -- curl -s -u admin:financeflow \
+>   "http://localhost:3000/api/datasources/uid/$DS_UID/health"
+> # expect: {"status":"OK", message: "Successfully queried the Prometheus API"}
+> ```
+
 ### Step 1 — Apply the dashboard ConfigMap
 
 ```bash

@@ -23,6 +23,10 @@ spec:
         spec:
           containers:
             - name: grafana
+              # No envFrom/BEARER_TOKEN here — see datasource.yaml's comments
+              # for why ($__env{} templating and spec.valuesFrom were both
+              # tried and ruled out). The real token is PATCHed into the
+              # datasource directly via Grafana's API instead.
               resources:
                 requests:
                   cpu: 100m
