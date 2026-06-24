@@ -28,3 +28,5 @@ resources:
   - triggertemplate-financeflow.yaml
   - eventlistener.yaml
   - route-eventlistener.yaml
+  - networkpolicy-allow-router-to-webhook.yaml
+  - peerauthentication-webhook-ingress-permissive.yaml

@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-router-to-webhook
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  podSelector:
+    matchLabels:
+      eventlistener: financeflow-webhook
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # OpenShift HAProxy router lives in the openshift-ingress namespace —
+        # same pattern as networkpolicy-allow-portal.yaml in Chapter 3. The
+        # EventListener was added in Chapter 6, after Chapter 3's deny-all
+        # default — without this, GitHub's webhook POST never reaches the
+        # pod at all (manifests as a 502 from the Route, since the
+        # connection itself is blocked before this gets to the mTLS layer).
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+      ports:
+        - protocol: TCP
+          port: 8080

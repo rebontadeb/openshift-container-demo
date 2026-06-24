@@ -1,0 +1,17 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: webhook-ingress-permissive
+  namespace: financeflow-workshop
+spec:
+  # Same pattern as portal-ingress-permissive (Chapter 5) — the namespace-wide
+  # financeflow-mtls policy is STRICT, but the OpenShift router (which
+  # forwards GitHub's webhook POST) is outside the mesh and speaks plain
+  # HTTP. Without this override, the Envoy sidecar rejects the router's
+  # connection outright, surfacing as a 502 on the Route with no application
+  # log at all — easy to mistake for a route/service misconfiguration.
+  selector:
+    matchLabels:
+      eventlistener: financeflow-webhook
+  mtls:
+    mode: PERMISSIVE

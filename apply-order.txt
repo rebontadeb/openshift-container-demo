@@ -201,17 +201,25 @@ CHAPTER 06 — CI/CD
 54. chapters/06-cicd/manifests/triggertemplate-financeflow.yaml
 55. chapters/06-cicd/manifests/eventlistener.yaml
 56. chapters/06-cicd/manifests/route-eventlistener.yaml
+57. chapters/06-cicd/manifests/networkpolicy-allow-router-to-webhook.yaml
+58. chapters/06-cicd/manifests/peerauthentication-webhook-ingress-permissive.yaml
+    (without BOTH of these, GitHub's webhook POST never reaches the
+     EventListener — Chapter 3's deny-all NetworkPolicy and Chapter 5's
+     STRICT namespace-wide mTLS both apply to it too, same as the portal in
+     Chapters 3/5, but nothing added the matching exceptions when the
+     EventListener was introduced here. Symptom: the Route returns 502 with
+     zero application-level log)
 
     -- ArgoCD (apply after the OpenShift GitOps operator is ready) --
-57. chapters/06-cicd/manifests/argocd-project.yaml
+59. chapters/06-cicd/manifests/argocd-project.yaml
     (apply into openshift-gitops: oc apply -f ... -n openshift-gitops)
-58. chapters/06-cicd/manifests/argocd-app-financeflow.yaml
+60. chapters/06-cicd/manifests/argocd-app-financeflow.yaml
     (apply into openshift-gitops: oc apply -f ... -n openshift-gitops)
 
     -- Trigger a pipeline run manually --
-59. chapters/06-cicd/manifests/pipelinerun-account-service.yaml
+61. chapters/06-cicd/manifests/pipelinerun-account-service.yaml
     (use `oc create -f`, not `oc apply -f` — generateName creates a new object each time)
-60. chapters/06-cicd/manifests/pipelinerun-transaction-service.yaml
+62. chapters/06-cicd/manifests/pipelinerun-transaction-service.yaml
     (use `oc create -f`, not `oc apply -f`)
 
 
@@ -224,10 +232,10 @@ CHAPTER 07 — Observability
     --  set up there now — see Chapter 05 above. Nothing to do here.) --
 
     -- Step 7b: Install Grafana Operator (cluster-admin) --
-61. chapters/07-observability/manifests/grafana/namespace.yaml
-62. chapters/07-observability/manifests/grafana/operatorgroup.yaml
-63. chapters/07-observability/manifests/grafana/subscription.yaml
-64. chapters/07-observability/manifests/grafana/serviceaccount.yaml
+63. chapters/07-observability/manifests/grafana/namespace.yaml
+64. chapters/07-observability/manifests/grafana/operatorgroup.yaml
+65. chapters/07-observability/manifests/grafana/subscription.yaml
+66. chapters/07-observability/manifests/grafana/serviceaccount.yaml
 
     >> Wait: oc wait --for=condition=Ready pods -l control-plane=controller-manager \
              -n grafana --timeout=120s
@@ -239,33 +247,33 @@ CHAPTER 07 — Observability
       -n grafana --dry-run=client -o yaml | oc apply -f -
 
     -- Step 7d: Deploy Grafana instance and dashboards --
-65. chapters/07-observability/manifests/grafana/grafana.yaml
+67. chapters/07-observability/manifests/grafana/grafana.yaml
 
     >> Wait: oc wait --for=condition=GrafanaReady grafana/financeflow-grafana \
              -n grafana --timeout=120s
 
-66. chapters/07-observability/manifests/grafana/datasource.yaml
-67. chapters/07-observability/manifests/grafana/route.yaml
-68. chapters/07-observability/manifests/grafana/dashboard-service-mesh.yaml
+68. chapters/07-observability/manifests/grafana/datasource.yaml
+69. chapters/07-observability/manifests/grafana/route.yaml
+70. chapters/07-observability/manifests/grafana/dashboard-service-mesh.yaml
 
     -- Step 7e: App metrics and alerting --
-69. chapters/07-observability/manifests/servicemonitor-account-service.yaml
-70. chapters/07-observability/manifests/servicemonitor-transaction-service.yaml
+71. chapters/07-observability/manifests/servicemonitor-account-service.yaml
+72. chapters/07-observability/manifests/servicemonitor-transaction-service.yaml
     (istio-sidecar-metrics PodMonitor was applied in Chapter 5, step 47 — not repeated here)
-71. chapters/07-observability/manifests/prometheusrule-financeflow.yaml
+73. chapters/07-observability/manifests/prometheusrule-financeflow.yaml
 
     -- Step 7f: Tempo + OpenTelemetry (requires Tempo Operator [Ch.5] and OTel Operator) --
-72. chapters/07-observability/manifests/tempo.yaml
+74. chapters/07-observability/manifests/tempo.yaml
     (TempoMonolithic — deploy before the Collector, which sends traces here)
 
     >> Wait: oc get pods -l app.kubernetes.io/managed-by=tempo-operator
     >> Wait: oc get route tempo-financeflow-jaegerui
 
-73. chapters/07-observability/manifests/otel-collector.yaml
-74. chapters/07-observability/manifests/servicemonitor-otel-collector.yaml
+75. chapters/07-observability/manifests/otel-collector.yaml
+76. chapters/07-observability/manifests/servicemonitor-otel-collector.yaml
 
     -- Step 7g: Trace generation (Lab 7c — instrument app.py with the OTel SDK first) --
-75. chapters/07-observability/manifests/grafana-dashboard-configmap.yaml
+77. chapters/07-observability/manifests/grafana-dashboard-configmap.yaml
 
 
 ========================================
