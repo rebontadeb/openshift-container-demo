@@ -345,8 +345,8 @@ step "Deploy the OTel Collector and its ServiceMonitor"
 oc apply -f 07-observability/manifests/otel-collector.yaml
 oc apply -f 07-observability/manifests/servicemonitor-otel-collector.yaml
 
-step "Apply the trace-generation Grafana dashboard ConfigMap"
-oc apply -f 07-observability/manifests/grafana-dashboard-configmap.yaml
+step "Apply the FinanceFlow overview dashboard (GrafanaDashboard CR, not a sidecar-discovered ConfigMap)"
+oc apply -f 07-observability/manifests/dashboard-financeflow-overview.yaml
 
 # ──────────────────────────────────────────────────────────────────────────
 # Summary

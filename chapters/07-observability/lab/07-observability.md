@@ -416,11 +416,19 @@ oc apply -f chapters/07-observability/manifests/grafana/route.yaml
 > # expect: {"status":"OK", message: "Successfully queried the Prometheus API"}
 > ```
 
-### Step 1 — Apply the dashboard ConfigMap
+### Step 1 — Apply the dashboard
 
 ```bash
-oc apply -f chapters/07-observability/manifests/grafana-dashboard-configmap.yaml
+oc apply -f chapters/07-observability/manifests/dashboard-financeflow-overview.yaml
 ```
+
+> This used to be a plain ConfigMap relying on a "Grafana sidecar discovers
+> ConfigMaps labeled `grafana_dashboard: \"true\"`" mechanism — confirmed
+> live that this Grafana deployment has no such sidecar (just one
+> container in the pod: `grafana` itself), so the ConfigMap applied with no
+> error but Grafana never displayed it. It's a `GrafanaDashboard` CR now,
+> the same mechanism `dashboard-service-mesh.yaml` already uses
+> successfully.
 
 ### Step 2 — Access Grafana
 
@@ -428,14 +436,13 @@ oc apply -f chapters/07-observability/manifests/grafana-dashboard-configmap.yaml
 oc get route grafana -n grafana
 ```
 
-### Step 3 — Import the dashboard
+### Step 3 — Find the dashboard
 
-If the Grafana sidecar discovers the ConfigMap automatically (label `grafana_dashboard: "true"`), the dashboard appears under **Dashboards → FinanceFlow — Service Dashboard**.
-
-If not, import manually:
-1. Grafana → **Dashboards → Import**
-2. Copy the JSON content from `grafana-dashboard-configmap.yaml` (the value of `financeflow-dashboard.json`)
-3. Click **Import**
+It appears under **Dashboards → FinanceFlow — Service Dashboard** within a
+few seconds of applying. If it doesn't show up, check the CR status:
+```bash
+oc get grafanadashboard financeflow-overview -n grafana -o jsonpath='{.status}'
+```
 
 ### Step 4 — Explore the dashboard
 

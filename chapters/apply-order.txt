@@ -316,7 +316,12 @@ CHAPTER 07 — Observability
 78. chapters/07-observability/manifests/servicemonitor-otel-collector.yaml
 
     -- Step 7g: Trace generation (Lab 7c — instrument app.py with the OTel SDK first) --
-79. chapters/07-observability/manifests/grafana-dashboard-configmap.yaml
+79. chapters/07-observability/manifests/dashboard-financeflow-overview.yaml
+    (this used to be a plain ConfigMap relying on a "Grafana sidecar
+     discovers labeled ConfigMaps" mechanism that was never actually
+     configured on this Grafana deployment — applied with no error, but
+     Grafana never saw it. Converted to a GrafanaDashboard CR, same
+     mechanism dashboard-service-mesh.yaml already uses successfully)
 
 
 ========================================

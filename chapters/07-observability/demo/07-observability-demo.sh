@@ -156,8 +156,8 @@ pause
 #   "Finally — a business dashboard. Not just infra metrics.
 #    Transfer volume in dollars, account balances, success rate."
 
-say "Apply the Grafana dashboard ConfigMap"
-oc apply -f "$CH7/grafana-dashboard-configmap.yaml"
+say "Apply the FinanceFlow overview dashboard (GrafanaDashboard CR)"
+oc apply -f "$CH7/dashboard-financeflow-overview.yaml"
 
 GRAFANA_URL="https://$(oc get route grafana -n grafana -o jsonpath='{.spec.host}' 2>/dev/null || \
   oc get route grafana -o jsonpath='{.spec.host}' 2>/dev/null || \
