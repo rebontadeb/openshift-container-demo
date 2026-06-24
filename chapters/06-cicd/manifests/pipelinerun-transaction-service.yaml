@@ -27,4 +27,7 @@ spec:
       persistentVolumeClaim:
         claimName: pipeline-source
 
-  serviceAccountName: financeflow-cicd
+  # See pipelinerun-account-service.yaml comment — tekton.dev/v1 requires
+  # this under taskRunTemplate, not at the top level.
+  taskRunTemplate:
+    serviceAccountName: financeflow-cicd

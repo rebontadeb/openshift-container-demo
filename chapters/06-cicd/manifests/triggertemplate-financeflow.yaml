@@ -33,10 +33,13 @@ spec:
           - name: image-name
             value: financeflow-account
           - name: image-tag
-            # Use first 7 chars of the commit SHA as the image tag
+            # Full commit SHA used as the image tag
             value: $(tt.params.revision)
         workspaces:
           - name: source
             persistentVolumeClaim:
               claimName: pipeline-source
-        serviceAccountName: financeflow-cicd
+        # tekton.dev/v1 requires this under taskRunTemplate, not at the top
+        # level — see pipelinerun-account-service.yaml comment.
+        taskRunTemplate:
+          serviceAccountName: financeflow-cicd
