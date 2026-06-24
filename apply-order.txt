@@ -3,10 +3,16 @@ FinanceFlow Workshop — YAML Apply Order
 Execute in this exact sequence. Wait for each step to be Ready before proceeding.
 
 NOTE: Chapter 06 files already point at https://github.com/rebontadeb/openshift-container-demo.git
+      — replace this with your own fork's URL if deploying this workshop elsewhere.
 NOTE: Chapter 07 Grafana requires a manual token step (see Step 7c below).
 NOTE: secret-postgres.yaml, secret-github-webhook.yaml, and secret-git-credentials.yaml
       are placeholders for documentation only (REPLACE_ME values) — create all three
       Secrets imperatively instead, as shown below. Never `oc apply -f` them directly.
+NOTE: chapters/05-service-mesh/manifests/kiali.yaml's external_services.grafana.url is
+      hardcoded to THIS cluster's Grafana route (apps.cluster-mxqd5.dynamic2...) — every
+      new cluster gets a different *.apps.<id>.<domain> hostname. Update it to match
+      `oc get route grafana -n grafana` after Chapter 7 runs (Kiali itself works fine
+      with the stale value — it only breaks the optional embedded Grafana link).
 
 
 ========================================
@@ -169,6 +175,20 @@ CHAPTER 06 — CI/CD
     -- though `oc get application -n openshift-gitops` shows it Synced/Healthy --
     oc patch console.operator.openshift.io cluster --type=json \
       -p '[{"op": "add", "path": "/spec/plugins/-", "value": "gitops-plugin"}]'
+
+    -- Grant financeflow-cicd permission to push images and run buildah --
+    -- (financeflow-cicd ServiceAccount already exists from Chapter 4) --
+    -- Without these two, the PipelineRun's build Task fails (no registry
+    -- push permission) or every Task in the Pipeline gets "Permission
+    -- denied" writing to the shared pipeline-source PVC — pipelines-scc,
+    -- NOT privileged, since its fsGroup: MustRunAs is what makes the shared
+    -- workspace writable across Tasks/pods; see Chapter 6 lab Troubleshooting --
+    oc adm policy add-role-to-user \
+      registry-editor \
+      system:serviceaccount:financeflow-workshop:financeflow-cicd
+    oc adm policy add-scc-to-user pipelines-scc \
+      -z financeflow-cicd \
+      -n financeflow-workshop
 
     -- Create the GitHub webhook Secret imperatively --
     oc create secret generic github-webhook-secret \
