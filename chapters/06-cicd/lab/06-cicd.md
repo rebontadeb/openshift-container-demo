@@ -47,6 +47,23 @@ ClusterTasks were removed in OpenShift Pipelines 1.17 — shared Tasks now live 
 oc get tasks -n openshift-pipelines | grep -E "git-clone|buildah|openshift-client"
 ```
 
+### Step 1b — Enable the Pipelines console plugin
+
+The operator installs the `pipelines-console-plugin` pod, but doesn't always
+enable it in the cluster's Console config — without this, the Developer
+perspective's **Pipelines** view stays empty even though `oc get pipeline`
+shows your Pipeline exists:
+
+```bash
+oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}'
+# if "pipelines-console-plugin" is missing from this list:
+oc patch console.operator.openshift.io cluster --type=json \
+  -p '[{"op": "add", "path": "/spec/plugins/-", "value": "pipelines-console-plugin"}]'
+
+# wait for the console pod to roll out, then hard-refresh your browser
+oc get pods -n openshift-console
+```
+
 ### Step 2 — Install OpenShift GitOps
 
 **Administrator → OperatorHub → search "OpenShift GitOps"**

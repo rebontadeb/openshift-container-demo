@@ -154,6 +154,16 @@ CHAPTER 05 — Service Mesh (OSSM 3 / Sail Operator — requires cluster-admin)
 CHAPTER 06 — CI/CD
 ========================================
 
+    -- Enable the Pipelines console plugin (cluster-admin, one-time) --
+    -- The operator installs the pipelines-console-plugin pod but doesn't
+    -- always enable it in the Console config — without this, Developer
+    -- perspective's Pipelines view stays empty even though `oc get pipeline`
+    -- shows the Pipeline exists --
+    oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}'
+    -- if "pipelines-console-plugin" is missing from that list: --
+    oc patch console.operator.openshift.io cluster --type=json \
+      -p '[{"op": "add", "path": "/spec/plugins/-", "value": "pipelines-console-plugin"}]'
+
     -- Create the GitHub webhook Secret imperatively --
     oc create secret generic github-webhook-secret \
       --from-literal=secret=$(openssl rand -hex 20)
