@@ -886,3 +886,4 @@ openshift-containerization-demo/
 ---
 
 *Workshop validated on OpenShift 4.21 (OpenShift Service Mesh 3 / Sail Operator, Tempo Operator); minimum 4.18, enforced by `chapters/00-prerequisites/demo/cluster-preflight-check.sh`.*
+<!-- loop-fix test -->
