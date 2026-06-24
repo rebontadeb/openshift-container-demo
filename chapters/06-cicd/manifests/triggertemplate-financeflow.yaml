@@ -1,0 +1,42 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: financeflow-trigger-template
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  params:
+    - name: repo-url
+    - name: revision
+    - name: ref
+  resourcetemplates:
+    # Build account-service on every push to main
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: financeflow-account-webhook-
+        namespace: financeflow-workshop
+        labels:
+          app: financeflow
+          triggers.tekton.dev/trigger: github-push
+      spec:
+        pipelineRef:
+          name: financeflow-pipeline
+        params:
+          - name: repo-url
+            value: $(tt.params.repo-url)
+          - name: revision
+            value: $(tt.params.revision)
+          - name: service
+            value: account-service
+          - name: image-name
+            value: financeflow-account
+          - name: image-tag
+            # Use first 7 chars of the commit SHA as the image tag
+            value: $(tt.params.revision)
+        workspaces:
+          - name: source
+            persistentVolumeClaim:
+              claimName: pipeline-source
+        serviceAccountName: financeflow-cicd

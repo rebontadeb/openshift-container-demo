@@ -1,0 +1,13 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-ingress
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  podSelector: {}     # empty selector = applies to ALL pods in this namespace
+  policyTypes:
+    - Ingress
+  # no ingress rules = deny all inbound traffic
+  # egress is unrestricted — DNS and outbound calls still work

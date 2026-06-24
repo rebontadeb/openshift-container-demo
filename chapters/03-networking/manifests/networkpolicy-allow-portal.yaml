@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-router-to-portal
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  podSelector:
+    matchLabels:
+      tier: portal
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # OpenShift HAProxy router lives in the openshift-ingress namespace
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+      ports:
+        - protocol: TCP
+          port: 8080

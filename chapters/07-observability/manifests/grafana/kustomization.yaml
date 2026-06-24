@@ -1,0 +1,35 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Deploy Grafana Operator and FinanceFlow Grafana instance:
+#
+#   Step 1 — Install operator (requires cluster-admin):
+#     oc apply -f namespace.yaml
+#     oc apply -f operatorgroup.yaml
+#     oc apply -f subscription.yaml
+#     # Wait for operator to become ready (~60s)
+#     oc wait --for=condition=Ready pods -l control-plane=controller-manager -n grafana --timeout=120s
+#
+#   Step 2 — Create SA and generate bearer token secret:
+#     oc apply -f serviceaccount.yaml
+#     TOKEN=$(oc create token grafana-sa -n grafana --duration=8760h)
+#     oc create secret generic grafana-thanos-bearer-token \
+#       --from-literal=BEARER_TOKEN="Bearer $TOKEN" \
+#       -n grafana --dry-run=client -o yaml | oc apply -f -
+#
+#   Step 3 — Deploy Grafana and observability resources:
+#     oc apply -k .
+#
+# NOTE: grafana-thanos-bearer-token is NOT in this list - bearer-token-secret.yaml
+# is a placeholder (REPLACE_WITH_GENERATED_TOKEN) for documentation only. Create
+# the real secret imperatively first (Step 2 above) so a re-run of this kustomize
+# apply never overwrites it.
+resources:
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml
+  - serviceaccount.yaml
+  - grafana.yaml
+  - datasource.yaml
+  - route.yaml
+  - dashboard-service-mesh.yaml

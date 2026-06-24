@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    tier: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: financeflow
+      tier: database
+  strategy:
+    type: Recreate      # databases must not have two instances writing at once
+  template:
+    metadata:
+      labels:
+        app: financeflow
+        tier: database
+    spec:
+      containers:
+        - name: postgres
+          # bitnami/postgresql supports arbitrary UIDs — works with OpenShift
+          # restricted-v2 SCC without any additional permissions
+          image: docker.io/bitnami/postgresql:latest
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+          env:
+            - name: POSTGRESQL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_USER
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_DB
+          resources:
+            requests:
+              cpu:    100m
+              memory: 256Mi
+            limits:
+              cpu:    500m
+              memory: 512Mi
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /bitnami/postgresql
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "financeflow", "-d", "financeflow"]
+            initialDelaySeconds: 30
+            periodSeconds:       10
+            failureThreshold:    5
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "financeflow", "-d", "financeflow"]
+            initialDelaySeconds: 10
+            periodSeconds:       5
+            failureThreshold:    3
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-data
+        - name: init-scripts
+          configMap:
+            name: postgres-init

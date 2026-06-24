@@ -1,0 +1,32 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: Grafana
+metadata:
+  name: financeflow-grafana
+  namespace: grafana
+  labels:
+    dashboards: financeflow
+spec:
+  config:
+    security:
+      admin_user: admin
+      admin_password: financeflow
+    auth:
+      disable_login_form: "false"
+    auth.anonymous:
+      enabled: "true"
+      org_role: Viewer
+    server:
+      root_url: "%(protocol)s://%(domain)s/"
+  deployment:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: grafana
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi

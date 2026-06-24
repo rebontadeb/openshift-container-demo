@@ -1,0 +1,11 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: financeflow-transaction
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    tier: transaction-service
+spec:
+  lookupPolicy:
+    local: true

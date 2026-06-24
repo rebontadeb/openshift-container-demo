@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-account-service
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  podSelector:
+    matchLabels:
+      tier: account-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              tier: portal
+        - podSelector:
+            matchLabels:
+              tier: transaction-service   # transaction-service calls account-service for balance checks
+      ports:
+        - protocol: TCP
+          port: 8080

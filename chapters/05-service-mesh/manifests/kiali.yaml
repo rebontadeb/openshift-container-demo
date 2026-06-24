@@ -1,0 +1,40 @@
+apiVersion: kiali.io/v1alpha1
+kind: Kiali
+metadata:
+  name: kiali
+  namespace: istio-system
+spec:
+  auth:
+    strategy: openshift
+  deployment:
+    accessible_namespaces:
+      - financeflow-workshop
+    cluster_wide_access: true
+  external_services:
+    prometheus:
+      url: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
+      auth:
+        type: bearer
+        use_kiali_token: true
+      thanos_proxy:
+        enabled: false
+    custom_dashboards:
+      prometheus:
+        url: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
+        auth:
+          type: bearer
+          use_kiali_token: true
+    grafana:
+      enabled: true
+      # Replace with this cluster's actual Grafana route once Chapter 7 creates
+      # it (`oc get route -n grafana`) — every workshop cluster gets a
+      # different *.apps.<cluster-id>.<domain> hostname, so this can never be
+      # hardcoded to one specific cluster (e.g. a leftover cluster-8c992 host
+      # from a prior run would silently 404 on any other cluster).
+      url: https://<REPLACE_WITH_GRAFANA_ROUTE_HOST>
+      in_cluster_url: http://financeflow-grafana-service.grafana.svc.cluster.local:3000
+      auth:
+        type: basic
+        username: admin
+        password: financeflow
+  istio_namespace: istio-system

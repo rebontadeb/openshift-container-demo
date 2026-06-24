@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Apply all Chapter 3 manifests:
+#   oc apply -k chapters/03-networking/manifests/
+#
+# NOTE: Services (postgres, account-service, transaction-service, portal) are
+# created in Chapter 2 alongside their Deployments - see
+# chapters/02-deployments/manifests/. Chapter 3 only adds the Route and
+# NetworkPolicies on top of those existing Services.
+resources:
+  - route-portal.yaml
+  - networkpolicy-deny-all.yaml
+  - networkpolicy-allow-portal.yaml
+  - networkpolicy-allow-account-service.yaml
+  - networkpolicy-allow-transaction-service.yaml
+  - networkpolicy-allow-postgres.yaml
+  - networkpolicy-allow-monitoring.yaml

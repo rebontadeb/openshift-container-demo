@@ -1,0 +1,24 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: transaction-service
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  host: transaction-service
+
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http2MaxRequests: 50
+        pendingRequests: 25
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 60s        # longer ejection for the payment service
+      maxEjectionPercent: 50

@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: financeflow-developers-view
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+subjects:
+  - kind: Group
+    name: financeflow-developers    # OpenShift group — members can view but not modify
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: financeflow-viewer
+  apiGroup: rbac.authorization.k8s.io

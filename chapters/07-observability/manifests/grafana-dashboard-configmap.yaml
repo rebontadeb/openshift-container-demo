@@ -1,0 +1,108 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: financeflow-grafana-dashboard
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    grafana_dashboard: "true"    # Grafana sidecar discovers ConfigMaps with this label
+data:
+  financeflow-dashboard.json: |
+    {
+      "title": "FinanceFlow — Service Dashboard",
+      "uid": "financeflow-overview",
+      "tags": ["financeflow", "workshop"],
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Request Rate (req/s)",
+          "type": "graph",
+          "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "rate(http_requests_total{namespace=\"financeflow-workshop\"}[2m])",
+              "legendFormat": "{{ job }} - {{ method }} {{ endpoint }}"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Error Rate (%)",
+          "type": "graph",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "rate(http_requests_total{namespace=\"financeflow-workshop\", status=~\"5..\"}[2m]) / rate(http_requests_total{namespace=\"financeflow-workshop\"}[2m]) * 100",
+              "legendFormat": "{{ job }} error %"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "P99 Latency (seconds)",
+          "type": "graph",
+          "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{namespace=\"financeflow-workshop\"}[5m]))",
+              "legendFormat": "{{ job }} P99"
+            },
+            {
+              "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{namespace=\"financeflow-workshop\"}[5m]))",
+              "legendFormat": "{{ job }} P50"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Transfer Volume ($/min)",
+          "type": "graph",
+          "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "rate(transfer_amount_dollars_sum[2m]) * 60",
+              "legendFormat": "Transfer volume $/min"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Active Account Balances",
+          "type": "stat",
+          "gridPos": { "x": 0, "y": 16, "w": 8, "h": 4 },
+          "targets": [
+            {
+              "expr": "sum(account_balance_dollars)",
+              "legendFormat": "Total balance"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Transfer Success Rate",
+          "type": "gauge",
+          "gridPos": { "x": 8, "y": 16, "w": 8, "h": 4 },
+          "options": { "minValue": 0, "maxValue": 100 },
+          "targets": [
+            {
+              "expr": "rate(transfer_requests_total{status=\"success\"}[5m]) / rate(transfer_requests_total[5m]) * 100",
+              "legendFormat": "Success %"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Pod Memory Usage",
+          "type": "graph",
+          "gridPos": { "x": 16, "y": 16, "w": 8, "h": 4 },
+          "targets": [
+            {
+              "expr": "container_memory_working_set_bytes{namespace=\"financeflow-workshop\", container!=\"istio-proxy\", container!=\"\"}",
+              "legendFormat": "{{ pod }}"
+            }
+          ]
+        }
+      ]
+    }

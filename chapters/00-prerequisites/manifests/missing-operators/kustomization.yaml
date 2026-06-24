@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Install all missing operators flagged by the prerequisite check:
+#   oc apply -k chapters/00-prerequisites/manifests/missing-operators/
+#
+# Installs into the openshift-operators namespace (cluster-wide), using the
+# default OperatorGroup already present there - no OperatorGroup needed.
+#
+# Package/channel pairs verified against OCP 4.21 OperatorHub (June 2026):
+#   - Service Mesh: OSSM 2 (servicemeshoperator) is end-of-life on 4.21 -
+#     this installs servicemeshoperator3 (Sail Operator-based OSSM 3.x).
+#   - Distributed tracing: Jaeger operator (jaeger-product) is deprecated -
+#     this installs tempo-product (Tempo Operator) instead.
+resources:
+  - pipelines-subscription.yaml
+  - gitops-subscription.yaml
+  - servicemesh-subscription.yaml
+  - tempo-subscription.yaml
+  - kiali-subscription.yaml
+  - opentelemetry-subscription.yaml

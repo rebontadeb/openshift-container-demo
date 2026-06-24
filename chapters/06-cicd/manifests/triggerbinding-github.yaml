@@ -1,0 +1,16 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: github-push-binding
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  params:
+    # Extract fields from the GitHub push webhook payload
+    - name: repo-url
+      value: $(body.repository.clone_url)
+    - name: revision
+      value: $(body.after)        # git SHA of the pushed commit
+    - name: ref
+      value: $(body.ref)          # refs/heads/main

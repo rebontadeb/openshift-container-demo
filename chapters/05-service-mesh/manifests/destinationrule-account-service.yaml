@@ -1,0 +1,33 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: account-service
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  host: account-service
+
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL    # use mesh-managed mTLS certs (pairs with PeerAuthentication STRICT)
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http2MaxRequests: 100
+        pendingRequests: 50
+    outlierDetection:
+      consecutive5xxErrors: 3      # eject pod after 3 consecutive 5xx responses
+      interval: 30s
+      baseEjectionTime: 30s        # ejected pod stays out for 30s minimum
+      maxEjectionPercent: 50       # never eject more than 50% of pods at once
+
+  # Subsets used by VirtualService for canary traffic splitting
+  subsets:
+    - name: v1-0
+      labels:
+        version: v1.0
+    - name: v1-1
+      labels:
+        version: v1.1

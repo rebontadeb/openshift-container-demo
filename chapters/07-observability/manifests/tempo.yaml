@@ -1,0 +1,26 @@
+# TempoMonolithic — single-binary Tempo deployment, ideal for demos/workshops.
+# No object storage (S3/etc.) needed: traces are held in a 2Gi in-memory volume.
+# jaegerui.enabled exposes a Jaeger-compatible UI (Tempo itself ships no native UI)
+# at the Route tempo-financeflow-jaegerui.
+apiVersion: tempo.grafana.com/v1alpha1
+kind: TempoMonolithic
+metadata:
+  name: financeflow
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  storage:
+    traces:
+      backend: memory
+      size: 2Gi
+  jaegerui:
+    enabled: true
+  ingestion:
+    otlp:
+      grpc:
+        enabled: true
+      http:
+        enabled: true
+  route:
+    enabled: true

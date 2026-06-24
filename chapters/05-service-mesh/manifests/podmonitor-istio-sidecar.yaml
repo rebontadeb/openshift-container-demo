@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: istio-sidecar-metrics
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  selector:
+    matchLabels:
+      app: financeflow
+  podMetricsEndpoints:
+    - port: http-envoy-prom
+      path: /stats/prometheus
+      interval: 15s

@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Apply Chapter 6 CI resources (in financeflow-workshop namespace):
+#   oc apply -k chapters/06-cicd/manifests/
+#
+# Prereqs:
+#   1. OpenShift Pipelines operator installed
+#   2. OpenShift GitOps operator installed
+#   3. pipelinerun-*.yaml and argocd-*.yaml point at
+#      https://github.com/rebontadeb/openshift-container-demo.git (already filled in)
+#   4. Create github-webhook-secret imperatively (see secret-github-webhook.yaml comments)
+#   5. Create git-credentials-cicd imperatively and link it to the financeflow-cicd
+#      ServiceAccount (see secret-git-credentials.yaml comments) — needed by the
+#      update-manifest Task's git push step
+#
+# ArgoCD resources (argocd-project.yaml, argocd-app-financeflow.yaml) go into
+# the openshift-gitops namespace — apply them separately with cluster-admin.
+resources:
+  - pvc-pipeline-source.yaml
+  - task-run-tests.yaml
+  - task-update-manifest.yaml
+  - pipeline-financeflow.yaml
+  - triggerbinding-github.yaml
+  - triggertemplate-financeflow.yaml
+  - eventlistener.yaml
+  - route-eventlistener.yaml

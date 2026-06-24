@@ -1,0 +1,30 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: financeflow-transaction-service-run-
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    tekton.dev/pipeline: financeflow-pipeline
+spec:
+  pipelineRef:
+    name: financeflow-pipeline
+
+  params:
+    - name: repo-url
+      value: https://github.com/rebontadeb/openshift-container-demo.git
+    - name: revision
+      value: main
+    - name: service
+      value: transaction-service
+    - name: image-name
+      value: financeflow-transaction
+    - name: image-tag
+      value: "v1.0"
+
+  workspaces:
+    - name: source
+      persistentVolumeClaim:
+        claimName: pipeline-source
+
+  serviceAccountName: financeflow-cicd

@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: otel-collector
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: opentelemetry-collector
+  endpoints:
+    - port: prometheus    # collector exposes re-exported metrics on :8889
+      path: /metrics
+      interval: 30s

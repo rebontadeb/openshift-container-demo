@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: financeflow-app-use-scc
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+subjects:
+  - kind: ServiceAccount
+    name: financeflow-app
+    namespace: financeflow-workshop
+roleRef:
+  kind: ClusterRole
+  name: use-financeflow-scc
+  apiGroup: rbac.authorization.k8s.io

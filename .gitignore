@@ -1,0 +1,13 @@
+# Secrets — never commit
+.env
+
+# Local tool config
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Container artifacts
+*.tar

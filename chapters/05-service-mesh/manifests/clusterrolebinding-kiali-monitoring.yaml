@@ -1,0 +1,19 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kiali-cluster-monitoring-view
+  labels:
+    app: financeflow
+# Kiali (kiali.yaml) queries metrics from Thanos querier in openshift-monitoring
+# using its own service account token (external_services.prometheus.auth.use_kiali_token:
+# true). Without this binding, every Kiali graph/health request gets a 403 from
+# Thanos, since cluster-monitoring-view is what grants read access to cluster
+# and user-workload metrics via the Thanos querier tenancy checks.
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-monitoring-view
+subjects:
+  - kind: ServiceAccount
+    name: kiali-service-account
+    namespace: istio-system

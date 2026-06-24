@@ -1,0 +1,11 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: financeflow-portal
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    tier: portal
+spec:
+  lookupPolicy:
+    local: true

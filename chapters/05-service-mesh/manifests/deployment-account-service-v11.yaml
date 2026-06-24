@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: account-service-v11
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    tier: account-service
+    version: v1.1
+spec:
+  replicas: 1    # one canary pod alongside the two stable pods
+  selector:
+    matchLabels:
+      tier: account-service
+      version: v1.1
+  template:
+    metadata:
+      labels:
+        app: financeflow
+        tier: account-service
+        version: v1.1
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: financeflow-app
+      securityContext:
+        runAsNonRoot: true
+        # No hardcoded fsGroup — the namespace's allocated SCC range
+        # (financeflow-scc / restricted-v2, both MustRunAs) assigns one
+        # automatically, same as the stable deployment-account-service.yaml
+      containers:
+        - name: account-service
+          image: financeflow-account:v1.1
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: account-service-config
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: DB_PASSWORD
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            failureThreshold: 12
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

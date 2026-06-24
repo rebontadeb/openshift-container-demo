@@ -1,0 +1,75 @@
+# EventListener SA needs permission to watch Triggers resources (namespaced) and
+# ClusterInterceptors (cluster-scoped). OpenShift Pipelines ships both ClusterRoles.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: financeflow-cicd-triggers-eventlistener
+  namespace: financeflow-workshop
+subjects:
+  - kind: ServiceAccount
+    name: financeflow-cicd
+    namespace: financeflow-workshop
+roleRef:
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-roles
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: financeflow-cicd-triggers-clusterroles
+subjects:
+  - kind: ServiceAccount
+    name: financeflow-cicd
+    namespace: financeflow-workshop
+roleRef:
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-clusterroles
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: financeflow-cicd-clustertriggerbindings-view
+subjects:
+  - kind: ServiceAccount
+    name: financeflow-cicd
+    namespace: financeflow-workshop
+roleRef:
+  kind: ClusterRole
+  name: tekton-clustertriggerbindings-view-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: financeflow-webhook
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  serviceAccountName: financeflow-cicd
+
+  triggers:
+    - name: github-push-main
+      interceptors:
+        # Validate the GitHub webhook secret
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook-secret
+                secretKey: secret
+            - name: eventTypes
+              value: [push]
+        # Only trigger on pushes to main branch
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: body.ref == 'refs/heads/main'
+      bindings:
+        - ref: github-push-binding
+      template:
+        ref: financeflow-trigger-template

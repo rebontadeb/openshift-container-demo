@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Apply all Chapter 7 observability resources:
+#   oc apply -k chapters/07-observability/manifests/
+#
+# Prereqs:
+#   1. OpenTelemetry Operator installed (OperatorHub)
+#   2. Tempo Operator installed (OperatorHub, see Chapter 5 Lab 5a)
+#   3. User workload monitoring enabled, and istio-sidecar-metrics PodMonitor
+#      applied — both done in Chapter 5 (Kiali's traffic graphs depend on this
+#      same metrics pipeline, so it's set up there, not here)
+resources:
+  - tempo.yaml
+  - otel-collector.yaml
+  - servicemonitor-account-service.yaml
+  - servicemonitor-transaction-service.yaml
+  - servicemonitor-otel-collector.yaml
+  - prometheusrule-financeflow.yaml
+  - grafana/

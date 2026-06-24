@@ -1,0 +1,318 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: financeflow-service-mesh
+  namespace: grafana
+  labels:
+    dashboards: financeflow
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: financeflow
+  json: |
+    {
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "custom": {"fillOpacity": 10, "lineWidth": 2},
+              "unit": "reqps"
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "id": 1,
+          "options": {
+            "legend": {"displayMode": "table", "placement": "bottom"},
+            "tooltip": {"mode": "multi"}
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m])) by (destination_workload)",
+              "legendFormat": "{{destination_workload}}"
+            }
+          ],
+          "title": "Request Rate — per workload (req/s)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "custom": {"fillOpacity": 10, "lineWidth": 2},
+              "unit": "ms"
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "id": 2,
+          "options": {
+            "legend": {"displayMode": "table", "placement": "bottom"},
+            "tooltip": {"mode": "multi"}
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m])) by (le, destination_workload))",
+              "legendFormat": "p99 {{destination_workload}}"
+            },
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m])) by (le, destination_workload))",
+              "legendFormat": "p50 {{destination_workload}}"
+            }
+          ],
+          "title": "P99 Latency — per workload (ms)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 1}, {"color": "red", "value": 10}]},
+              "unit": "reqps"
+            }
+          },
+          "gridPos": {"h": 4, "w": 4, "x": 0, "y": 8},
+          "id": 3,
+          "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "targets": [
+            {
+              "expr": "sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",destination_workload=\"account-service\",reporter=\"destination\"}[2m]))",
+              "legendFormat": ""
+            }
+          ],
+          "title": "Current RPS — account-service",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 1}, {"color": "red", "value": 10}]},
+              "unit": "reqps"
+            }
+          },
+          "gridPos": {"h": 4, "w": 4, "x": 4, "y": 8},
+          "id": 4,
+          "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "targets": [
+            {
+              "expr": "sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",destination_workload=\"transaction-service\",reporter=\"destination\"}[2m]))",
+              "legendFormat": ""
+            }
+          ],
+          "title": "Current RPS — transaction-service",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 1}, {"color": "red", "value": 10}]},
+              "unit": "reqps"
+            }
+          },
+          "gridPos": {"h": 4, "w": 4, "x": 8, "y": 8},
+          "id": 5,
+          "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "targets": [
+            {
+              "expr": "sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",destination_workload=\"portal\",reporter=\"destination\"}[2m]))",
+              "legendFormat": ""
+            }
+          ],
+          "title": "Current RPS — portal",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "max": 100,
+              "min": 0,
+              "thresholds": {"steps": [{"color": "red", "value": 0}, {"color": "yellow", "value": 95}, {"color": "green", "value": 99}]},
+              "unit": "percent"
+            }
+          },
+          "gridPos": {"h": 4, "w": 4, "x": 12, "y": 8},
+          "id": 6,
+          "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "targets": [
+            {
+              "expr": "100 * sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\",response_code=~\"2..\"}[2m])) / sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m]))",
+              "legendFormat": ""
+            }
+          ],
+          "title": "Success Rate (2xx %)",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "max": 100,
+              "min": 0,
+              "thresholds": {"steps": [{"color": "red", "value": 0}, {"color": "yellow", "value": 50}, {"color": "green", "value": 90}]},
+              "unit": "percent"
+            }
+          },
+          "gridPos": {"h": 4, "w": 4, "x": 16, "y": 8},
+          "id": 7,
+          "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "targets": [
+            {
+              "expr": "100 * sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\",connection_security_policy=\"mutual_tls\"}[2m])) / sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m]))",
+              "legendFormat": ""
+            }
+          ],
+          "title": "mTLS Traffic (%)",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "max": 100,
+              "min": 0,
+              "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}]},
+              "unit": "percent"
+            }
+          },
+          "gridPos": {"h": 4, "w": 4, "x": 20, "y": 8},
+          "id": 8,
+          "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "targets": [
+            {
+              "expr": "100 * sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\",response_code!~\"2..\"}[2m])) / sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m]))",
+              "legendFormat": ""
+            }
+          ],
+          "title": "Error Rate (non-2xx)",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "custom": {"fillOpacity": 5, "lineWidth": 2},
+              "unit": "reqps"
+            }
+          },
+          "gridPos": {"h": 8, "w": 16, "x": 0, "y": 12},
+          "id": 9,
+          "options": {
+            "legend": {"displayMode": "table", "placement": "right"},
+            "tooltip": {"mode": "multi"}
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"source\"}[2m])) by (source_workload, destination_workload)",
+              "legendFormat": "{{source_workload}} → {{destination_workload}}"
+            }
+          ],
+          "title": "Request Volume — source → destination",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "custom": {"lineWidth": 2},
+              "unit": "reqps"
+            }
+          },
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 12},
+          "id": 10,
+          "options": {
+            "legend": {"displayMode": "list", "placement": "bottom"},
+            "tooltip": {"mode": "multi"}
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m])) by (response_code)",
+              "legendFormat": "HTTP {{response_code}}"
+            }
+          ],
+          "title": "Response Code Breakdown",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "custom": {"lineWidth": 2},
+              "unit": "ms"
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+          "id": 11,
+          "options": {
+            "legend": {"displayMode": "list", "placement": "bottom"},
+            "tooltip": {"mode": "multi"}
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",destination_workload=\"account-service\",reporter=\"destination\"}[2m])) by (le))",
+              "legendFormat": "p99"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",destination_workload=\"account-service\",reporter=\"destination\"}[2m])) by (le))",
+              "legendFormat": "p95"
+            },
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",destination_workload=\"account-service\",reporter=\"destination\"}[2m])) by (le))",
+              "legendFormat": "p50"
+            }
+          ],
+          "title": "Request Duration Percentiles — account-service",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "fieldConfig": {
+            "defaults": {
+              "custom": {"lineWidth": 2},
+              "unit": "ms"
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+          "id": 12,
+          "options": {
+            "legend": {"displayMode": "list", "placement": "bottom"},
+            "tooltip": {"mode": "multi"}
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",destination_workload=\"transaction-service\",reporter=\"destination\"}[2m])) by (le))",
+              "legendFormat": "p99"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",destination_workload=\"transaction-service\",reporter=\"destination\"}[2m])) by (le))",
+              "legendFormat": "p95"
+            },
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",destination_workload=\"transaction-service\",reporter=\"destination\"}[2m])) by (le))",
+              "legendFormat": "p50"
+            }
+          ],
+          "title": "Request Duration Percentiles — transaction-service",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["financeflow", "istio", "workshop"],
+      "templating": {
+        "list": [
+          {
+            "hide": 0,
+            "name": "DS_PROMETHEUS",
+            "pluginId": "prometheus",
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": {"from": "now-30m", "to": "now"},
+      "timezone": "browser",
+      "title": "FinanceFlow — Service Mesh",
+      "uid": "financeflow-mesh",
+      "version": 1
+    }

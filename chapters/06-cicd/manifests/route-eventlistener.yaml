@@ -1,0 +1,16 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: financeflow-webhook
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  to:
+    kind: Service
+    name: el-financeflow-webhook    # EventListener auto-creates a Service prefixed with "el-"
+  port:
+    targetPort: http-listener
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

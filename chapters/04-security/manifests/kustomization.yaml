@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Apply all Chapter 4 manifests:
+#   oc apply -k chapters/04-security/manifests/
+#
+# NOTE: scc-financeflow.yaml requires cluster-admin.
+#       The clusterrole and rolebinding for SCC usage also require cluster-admin.
+#       All other resources require only namespace admin.
+resources:
+  - serviceaccount-financeflow.yaml
+  - serviceaccount-cicd.yaml
+  - scc-financeflow.yaml
+  - clusterrole-use-financeflow-scc.yaml
+  - rolebinding-sa-use-scc.yaml
+  - role-viewer.yaml
+  - role-deployer.yaml
+  - rolebinding-viewer.yaml
+  - rolebinding-deployer.yaml

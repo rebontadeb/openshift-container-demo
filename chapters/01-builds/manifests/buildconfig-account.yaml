@@ -1,0 +1,36 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: financeflow-account
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    tier: account-service
+spec:
+  # ── Source ────────────────────────────────────────────────────
+  # Binary strategy: source is uploaded from the local machine via
+  # `oc start-build --from-dir=./app/account-service`
+  source:
+    type: Binary
+    binary: {}
+
+  # ── Strategy ──────────────────────────────────────────────────
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile   # relative to the uploaded source root
+      env:
+        - name: PYTHON_VERSION
+          value: "3.11"
+
+  # ── Output ────────────────────────────────────────────────────
+  output:
+    to:
+      kind: ImageStreamTag
+      name: financeflow-account:v1.0
+
+  # ── Triggers ──────────────────────────────────────────────────
+  triggers:
+    - type: ConfigChange       # rebuild when this BuildConfig is updated
+    - type: ImageChange        # rebuild when the base image changes
+      imageChange: {}

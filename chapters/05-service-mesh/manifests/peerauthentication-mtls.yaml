@@ -1,0 +1,20 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: financeflow-mtls
+  namespace: financeflow-workshop
+spec:
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: portal-ingress-permissive
+  namespace: financeflow-workshop
+spec:
+  selector:
+    matchLabels:
+      tier: portal
+  mtls:
+    mode: PERMISSIVE

@@ -1,0 +1,61 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: run-tests
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  description: Run Python unit tests for a FinanceFlow service
+  params:
+    - name: service
+      type: string
+      description: "Service directory under app/: account-service, transaction-service, portal"
+  workspaces:
+    - name: source
+      description: Cloned source repository
+  steps:
+    - name: install-deps
+      image: python:3.11-slim
+      workingDir: $(workspaces.source.path)/app/$(params.service)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        pip install --no-cache-dir -r requirements.txt
+        echo "Dependencies installed"
+
+    - name: syntax-check
+      image: python:3.11-slim
+      workingDir: $(workspaces.source.path)/app/$(params.service)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        python -m py_compile app.py
+        echo "Syntax check passed: app.py"
+
+    - name: run-pytest
+      image: python:3.11-slim
+      workingDir: $(workspaces.source.path)/app/$(params.service)
+      env:
+        # Provide dummy values so app.py can import without real credentials
+        - name: DB_USER
+          value: test
+        - name: DB_PASSWORD
+          value: test
+        - name: DB_HOST
+          value: localhost
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: test
+        - name: ACCOUNT_SERVICE_URL
+          value: http://localhost:8080
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        pip install --no-cache-dir -r requirements.txt pytest 2>/dev/null
+        if [ -d tests ]; then
+          python -m pytest tests/ -v --tb=short
+        else
+          echo "No tests/ directory found — skipping pytest"
+        fi

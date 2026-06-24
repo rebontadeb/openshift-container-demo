@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transaction-service
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    tier: transaction-service
+  annotations:
+    secret.reloader.stakater.com/reload: "postgres-credentials"
+    configmap.reloader.stakater.com/reload: "transaction-service-config"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: financeflow
+      tier: transaction-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge:        1
+  template:
+    metadata:
+      labels:
+        app: financeflow
+        tier: transaction-service
+    spec:
+      containers:
+        - name: transaction-service
+          image: financeflow-transaction:v1.0
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: transaction-service-config
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: DB_PASSWORD
+          resources:
+            requests:
+              cpu:    100m
+              memory: 128Mi
+            limits:
+              cpu:    500m
+              memory: 256Mi
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            failureThreshold: 12
+            periodSeconds:    5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            periodSeconds:    15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            periodSeconds:    10
+            failureThreshold: 3
+          securityContext:
+            runAsNonRoot:             true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

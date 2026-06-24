@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Apply all Chapter 5 mesh resources (after the Istio control plane is ready
+# and the financeflow-workshop namespace is labeled for injection):
+#   oc apply -k chapters/05-service-mesh/manifests/
+#
+# NOTE: smcp.yaml (Istio/IstioCNI, sailoperator.io/v1) requires cluster-admin
+#       and goes into istio-system/istio-cni. smmr.yaml just labels the
+#       financeflow-workshop namespace for sidecar injection (OSSM 3 has no
+#       ServiceMeshMemberRoll). Apply both separately before the resources below.
+resources:
+  - peerauthentication-mtls.yaml
+  - destinationrule-account-service.yaml
+  - destinationrule-transaction-service.yaml
+  - virtualservice-account-service.yaml
+  - deployment-account-service-v11.yaml
+  - kiali.yaml
+  - clusterrolebinding-kiali-monitoring.yaml
+  - podmonitor-istio-sidecar.yaml

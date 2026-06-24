@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-transaction-service
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  podSelector:
+    matchLabels:
+      tier: transaction-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              tier: portal
+      ports:
+        - protocol: TCP
+          port: 8080

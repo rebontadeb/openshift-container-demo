@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: financeflow
+  namespace: openshift-gitops    # ArgoCD control plane namespace
+  labels:
+    app: financeflow
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io    # clean up cluster resources when app is deleted
+spec:
+  project: financeflow
+
+  source:
+    repoURL: https://github.com/rebontadeb/openshift-container-demo.git
+    targetRevision: main
+    path: chapters/02-deployments/manifests    # ArgoCD watches this directory
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: financeflow-workshop
+
+  syncPolicy:
+    automated:
+      prune: true        # remove resources deleted from git
+      selfHeal: true     # revert manual cluster changes — git is the source of truth
+    syncOptions:
+      - CreateNamespace=false    # namespace must already exist
+      - ApplyOutOfSyncOnly=true  # only sync resources that actually differ
+
+  # Health checks — ArgoCD uses these to determine sync success
+  ignoreDifferences:
+    # Ignore the replicas field — HPA manages this, not git
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas

@@ -1,0 +1,28 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: financeflow-portal
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    tier: portal
+    build-strategy: docker
+spec:
+  source:
+    type: Binary
+    binary: {}
+
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+
+  output:
+    to:
+      kind: ImageStreamTag
+      name: financeflow-portal:v1.0
+
+  triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange: {}

@@ -1,0 +1,114 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: financeflow-alerts
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    # Required for OpenShift user-workload monitoring to pick up these rules
+    openshift.io/prometheus-rule-evaluation-scope: leaf-prometheus
+spec:
+  groups:
+    - name: financeflow.availability
+      rules:
+        - alert: AccountServiceDown
+          expr: |
+            absent(up{job="account-service"} == 1)
+          for: 1m
+          labels:
+            severity: critical
+            service: account-service
+          annotations:
+            summary: "Account service has no healthy pods"
+            description: "No account-service pods have been reachable for 1 minute. Financial accounts may be unavailable."
+
+        - alert: TransactionServiceDown
+          expr: |
+            absent(up{job="transaction-service"} == 1)
+          for: 1m
+          labels:
+            severity: critical
+            service: transaction-service
+          annotations:
+            summary: "Transaction service has no healthy pods"
+            description: "No transaction-service pods have been reachable for 1 minute. Transfers and deposits are blocked."
+
+    - name: financeflow.errors
+      rules:
+        - alert: HighTransferErrorRate
+          expr: |
+            rate(transfer_requests_total{status="error"}[5m])
+            /
+            rate(transfer_requests_total[5m]) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            service: transaction-service
+          annotations:
+            summary: "Transfer error rate above 5%"
+            description: "{{ $value | humanizePercentage }} of transfers are failing. Check transaction-service logs and database connectivity."
+
+        - alert: HighAPIErrorRate
+          expr: |
+            rate(http_requests_total{status=~"5.."}[5m])
+            /
+            rate(http_requests_total[5m]) > 0.01
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "API error rate above 1% on {{ $labels.job }}"
+            description: "{{ $value | humanizePercentage }} of requests to {{ $labels.job }} are returning 5xx errors."
+
+    - name: financeflow.latency
+      rules:
+        - alert: SlowAccountLookup
+          expr: |
+            histogram_quantile(0.99,
+              rate(http_request_duration_seconds_bucket{job="account-service", endpoint="/api/accounts"}[5m])
+            ) > 2.0
+          for: 5m
+          labels:
+            severity: warning
+            service: account-service
+          annotations:
+            summary: "Account lookup P99 latency above 2s"
+            description: "The 99th percentile latency for account lookups is {{ $value }}s. Expected < 500ms."
+
+        - alert: SlowTransferProcessing
+          expr: |
+            histogram_quantile(0.95,
+              rate(transfer_duration_seconds_bucket[5m])
+            ) > 5.0
+          for: 5m
+          labels:
+            severity: critical
+            service: transaction-service
+          annotations:
+            summary: "Transfer processing P95 latency above 5s"
+            description: "The 95th percentile transfer processing time is {{ $value }}s. SLA breach risk."
+
+    - name: financeflow.resources
+      rules:
+        - alert: PodMemoryNearLimit
+          expr: |
+            container_memory_working_set_bytes{namespace="financeflow-workshop", container!="istio-proxy"}
+            /
+            container_spec_memory_limit_bytes{namespace="financeflow-workshop", container!="istio-proxy"} > 0.85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{ $labels.pod }} memory at {{ $value | humanizePercentage }} of limit"
+            description: "Container {{ $labels.container }} is using {{ $value | humanizePercentage }} of its memory limit. OOM kill risk."
+
+        - alert: PostgresConnectionsNearLimit
+          expr: |
+            pg_stat_activity_count > 80
+          for: 2m
+          labels:
+            severity: warning
+            service: postgres
+          annotations:
+            summary: "PostgreSQL active connections above 80"
+            description: "{{ $value }} active connections. Default max_connections is 100. Increase pool size or add connection pooling."

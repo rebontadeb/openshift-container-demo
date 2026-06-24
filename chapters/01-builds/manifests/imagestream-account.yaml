@@ -1,0 +1,11 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: financeflow-account
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    tier: account-service
+spec:
+  lookupPolicy:
+    local: true   # pods in this namespace can reference the image by short name

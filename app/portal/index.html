@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinanceFlow — OpenShift Workshop Demo</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+      <rect width="26" height="26" rx="7" fill="#4f8ef7" opacity=".15"/>
+      <path d="M7 13h5m0 0V8m0 5l4 4" stroke="#4f8ef7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="18" cy="9" r="2.5" stroke="#4f8ef7" stroke-width="1.5"/>
+    </svg>
+    FinanceFlow
+  </div>
+  <nav class="nav-links">
+    <button class="nav-btn active" onclick="showSection('dashboard')">Dashboard</button>
+    <button class="nav-btn"        onclick="showSection('accounts')">Accounts</button>
+    <button class="nav-btn"        onclick="showSection('transfer')">Transfer</button>
+    <button class="nav-btn"        onclick="showSection('history')">History</button>
+  </nav>
+  <div class="ocp-badge">
+    <span class="ocp-dot"></span>
+    Running on OpenShift
+    <span class="refresh-info">· <span id="refresh-countdown">10</span>s</span>
+    <button id="refresh-toggle" class="refresh-btn" title="Pause auto-refresh">⏸</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Dashboard ──────────────────────────────────────────── -->
+  <section id="section-dashboard">
+
+    <div class="summary-grid" id="summary-grid">
+      <div class="card"><div class="skeleton"></div><div class="skeleton" style="width:60%"></div></div>
+      <div class="card"><div class="skeleton"></div><div class="skeleton" style="width:60%"></div></div>
+      <div class="card"><div class="skeleton"></div><div class="skeleton" style="width:60%"></div></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">My Accounts</div>
+        <div id="account-list-dash"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton" style="width:80%"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Recent Transactions</div>
+        <ul class="txn-list" id="txn-list-dash"></ul>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ── Accounts ───────────────────────────────────────────── -->
+  <section id="section-accounts" style="display:none">
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-title-row">
+        <span class="card-title" style="margin-bottom:0">All Accounts</span>
+        <button class="btn-outline" id="toggle-add-account">+ Add Account</button>
+      </div>
+
+      <!-- Add Account form (hidden by default) -->
+      <div id="add-account-form-wrap" style="display:none">
+        <div class="form-divider"></div>
+        <form id="add-account-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Owner Name</label>
+              <input type="text" id="new-owner-name" placeholder="e.g. Alice Johnson" required />
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" id="new-email" placeholder="e.g. alice@example.com" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Account Number</label>
+              <input type="text" id="new-account-number" placeholder="FF-0000-CHK" required />
+            </div>
+            <div class="form-group">
+              <label>Account Type</label>
+              <select id="new-account-type">
+                <option value="checking">Checking</option>
+                <option value="savings">Savings</option>
+                <option value="investment">Investment</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Initial Balance (USD)</label>
+              <input type="number" id="new-initial-balance" min="0" step="0.01" placeholder="0.00" />
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;gap:10px">
+              <button class="btn-primary" type="submit" id="add-account-btn" style="margin-top:0">Create Account</button>
+              <button class="btn-cancel" type="button" id="cancel-add-account">Cancel</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div id="account-list-full"></div>
+    </div>
+
+  </section>
+
+  <!-- ── Transfer ───────────────────────────────────────────── -->
+  <section id="section-transfer" style="display:none">
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">Send Money</div>
+        <form id="transfer-form">
+          <div class="form-group">
+            <label>From Account</label>
+            <select id="from-account" required></select>
+          </div>
+          <div class="form-group">
+            <label>To Account</label>
+            <select id="to-account" required></select>
+          </div>
+          <div class="form-group">
+            <label>Amount (USD)</label>
+            <input type="number" id="transfer-amount" min="0.01" step="0.01" placeholder="0.00" required />
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="transfer-desc" placeholder="Optional note" />
+          </div>
+          <button class="btn-primary" type="submit" id="transfer-btn">Send Transfer</button>
+        </form>
+      </div>
+      <div class="card">
+        <div class="card-title">Quick Deposit</div>
+        <form id="deposit-form">
+          <div class="form-group">
+            <label>To Account</label>
+            <select id="deposit-account" required></select>
+          </div>
+          <div class="form-group">
+            <label>Amount (USD)</label>
+            <input type="number" id="deposit-amount" min="0.01" step="0.01" placeholder="0.00" required />
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="deposit-desc" placeholder="e.g. Payroll, Dividend" />
+          </div>
+          <button class="btn-primary" type="submit" id="deposit-btn">Deposit Funds</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── History ────────────────────────────────────────────── -->
+  <section id="section-history" style="display:none">
+    <div class="card">
+      <div class="card-title">Transaction History</div>
+      <ul class="txn-list" id="txn-list-full"></ul>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

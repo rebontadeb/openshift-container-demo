@@ -1,0 +1,56 @@
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: financeflow-scc
+  labels:
+    app: financeflow
+  annotations:
+    description: "SCC for FinanceFlow workloads — non-root, no privilege escalation, no host access"
+
+# Explicit priority beats the built-in restricted-v2 (priority: null, i.e. 0)
+# regardless of how the two SCCs compare on restrictiveness scoring — without
+# this, restricted-v2 can keep winning admission even when this SCC is just as
+# strict, since ties are broken by an internal point score, not by name.
+priority: 10
+
+# Container must run as a non-root UID
+runAsUser:
+  type: MustRunAsNonRoot
+
+# SELinux labels are auto-assigned by OpenShift
+seLinuxContext:
+  type: MustRunAs
+
+# MustRunAs (ranges derived from the namespace's allocated UID/GID annotations)
+# — RunAsAny here would make this SCC *less* restrictive than the built-in
+# restricted-v2, so restricted-v2 would always win priority and this SCC
+# would never actually be assigned to FinanceFlow pods.
+fsGroup:
+  type: MustRunAs
+supplementalGroups:
+  type: MustRunAs
+
+# No privileged containers
+allowPrivilegedContainer: false
+allowPrivilegeEscalation: false
+
+# Drop all Linux capabilities — app does not need any
+requiredDropCapabilities:
+  - ALL
+allowedCapabilities: []
+
+# No host namespace access
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+
+# Permitted volume types
+volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - persistentVolumeClaim
+  - projected
+  - secret

@@ -1,0 +1,86 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: project-request
+  namespace: openshift-config
+objects:
+
+  # 1 — Namespace: auto-labelled for identification/reporting (no ClusterResourceQuota
+  #     selects on this in the current setup — quota is per-namespace only, see below)
+  - apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: ${PROJECT_NAME}
+      annotations:
+        openshift.io/display-name: ${PROJECT_DISPLAYNAME}
+        openshift.io/description:  ${PROJECT_DESCRIPTION}
+        openshift.io/requester:    ${PROJECT_REQUESTING_USER}
+      labels:
+        region: apac-workshop
+
+  # 2 — RoleBinding: project admin (whoever requested the project)
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: admin
+      namespace: ${PROJECT_NAME}
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: admin
+    subjects:
+      - apiGroup: rbac.authorization.k8s.io
+        kind: User
+        name: ${PROJECT_ADMIN_USER}
+
+  # 3 — LimitRange: per-container defaults and caps
+  - apiVersion: v1
+    kind: LimitRange
+    metadata:
+      name: financeflow-limits
+      namespace: ${PROJECT_NAME}
+    spec:
+      limits:
+        - type: Container
+          default:          # applied when container omits limits
+            cpu: 500m
+            memory: 256Mi
+          defaultRequest:   # applied when container omits requests
+            cpu: 100m
+            memory: 128Mi
+          max:              # hard ceiling per container
+            cpu: "2"
+            memory: 1Gi
+          min:              # floor — prevents resource-free containers
+            cpu: 10m
+            memory: 32Mi
+
+  # 4 — ResourceQuota: namespace ceiling
+  - apiVersion: v1
+    kind: ResourceQuota
+    metadata:
+      name: financeflow-quota
+      namespace: ${PROJECT_NAME}
+    spec:
+      hard:
+        pods: "10"
+        requests.cpu: "1"
+        limits.cpu: "2"
+        requests.memory: 1Gi
+        limits.memory: 2Gi
+        persistentvolumeclaims: "5"
+        requests.storage: 50Gi
+        services.nodeports: "0"        # block NodePort — use Routes
+        services.loadbalancers: "0"    # block cloud LBs — use Routes
+
+parameters:
+  - name: PROJECT_NAME
+    required: true
+  - name: PROJECT_DISPLAYNAME
+    value: ""
+  - name: PROJECT_DESCRIPTION
+    value: ""
+  - name: PROJECT_ADMIN_USER
+    required: true
+  - name: PROJECT_REQUESTING_USER
+    value: ""

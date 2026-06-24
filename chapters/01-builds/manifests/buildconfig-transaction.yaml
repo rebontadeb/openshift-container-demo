@@ -1,0 +1,30 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: financeflow-transaction
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    tier: transaction-service
+spec:
+  source:
+    type: Binary
+    binary: {}
+
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+      env:
+        - name: PYTHON_VERSION
+          value: "3.11"
+
+  output:
+    to:
+      kind: ImageStreamTag
+      name: financeflow-transaction:v1.0
+
+  triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange: {}

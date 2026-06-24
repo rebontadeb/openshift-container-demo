@@ -1,0 +1,67 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: update-manifest
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  description: |
+    Update the image tag in a Deployment YAML and push the change back to git.
+    This is the GitOps link — ArgoCD detects the commit and syncs the cluster.
+  params:
+    - name: service
+      type: string
+      description: "Deployment name to update: account-service, transaction-service, portal"
+    - name: image-tag
+      type: string
+      description: New image tag (typically the git short SHA from the build step)
+    - name: git-user-name
+      type: string
+      default: "FinanceFlow Pipeline"
+    - name: git-user-email
+      type: string
+      default: "pipeline@financeflow-workshop"
+  workspaces:
+    - name: source
+      description: Cloned source repository (with write access via git credentials)
+  steps:
+    - name: update-yaml
+      image: quay.io/openshift/origin-cli:latest
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        MANIFEST="chapters/02-deployments/manifests/deployment-$(params.service).yaml"
+        NEW_TAG="$(params.image-tag)"
+        SERVICE="$(params.service)"
+
+        echo "Updating $MANIFEST → image tag: $NEW_TAG"
+
+        # Replace the image tag in the Deployment YAML
+        # Matches pattern: image: financeflow-<name>:<tag>
+        sed -i "s|financeflow-[^:]*:v[0-9.]*|financeflow-${SERVICE#*financeflow-}:${NEW_TAG}|g" "$MANIFEST" || \
+        sed -i "s|image: .*financeflow.*|image: financeflow-${SERVICE}:${NEW_TAG}|g" "$MANIFEST"
+
+        echo "Updated manifest:"
+        grep "image:" "$MANIFEST"
+
+    - name: git-commit-push
+      image: alpine/git:latest
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        git config user.name  "$(params.git-user-name)"
+        git config user.email "$(params.git-user-email)"
+
+        git add chapters/02-deployments/manifests/deployment-$(params.service).yaml
+        git diff --cached --stat
+
+        git commit -m "ci: update $(params.service) image to $(params.image-tag)" || \
+          echo "No changes to commit"
+
+        git push origin HEAD
+        echo "Pushed — ArgoCD will detect and sync"

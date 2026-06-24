@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: financeflow
+  namespace: openshift-gitops    # ArgoCD control plane namespace
+  labels:
+    app: financeflow
+spec:
+  description: "FinanceFlow application delivery project"
+
+  # Only allow syncing from this repository
+  sourceRepos:
+    - "https://github.com/rebontadeb/openshift-container-demo.git"
+
+  # Only allow deploying to the financeflow-workshop namespace
+  destinations:
+    - namespace: financeflow-workshop
+      server: https://kubernetes.default.svc    # in-cluster
+
+  # RBAC — which cluster resources ArgoCD can manage for this project
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: "apps"
+      kind: Deployment
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ConfigMap
+    - group: "route.openshift.io"
+      kind: Route
+    - group: "autoscaling"
+      kind: HorizontalPodAutoscaler
+    - group: "networking.k8s.io"
+      kind: NetworkPolicy
+
+  # Secrets are NOT in the whitelist — ArgoCD cannot read or modify credentials

@@ -1,0 +1,69 @@
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: financeflow
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+spec:
+  mode: deployment
+
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: financeflow-services
+              scrape_interval: 30s
+              static_configs:
+                - targets:
+                    - account-service:8080
+                    - transaction-service:8080
+
+    processors:
+      batch:
+        timeout: 5s
+        send_batch_size: 1000
+
+      memory_limiter:
+        limit_mib: 256
+        spike_limit_mib: 64
+        check_interval: 5s
+
+      resource:
+        attributes:
+          - key: deployment.environment
+            value: workshop
+            action: insert
+
+    exporters:
+      debug:
+        verbosity: normal
+
+      prometheus:
+        endpoint: 0.0.0.0:8889
+        namespace: financeflow
+
+      otlp/tempo:
+        endpoint: tempo-financeflow:4317
+        tls:
+          insecure: true
+
+    service:
+      pipelines:
+        traces:
+          receivers:  [otlp]
+          processors: [memory_limiter, resource, batch]
+          exporters:  [debug, otlp/tempo]
+
+        metrics:
+          receivers:  [otlp, prometheus]
+          processors: [memory_limiter, batch]
+          exporters:  [prometheus]

@@ -1,0 +1,36 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: financeflow-portal-s2i
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    tier: portal
+    build-strategy: s2i
+spec:
+  source:
+    type: Binary
+    binary: {}
+
+  # ── S2I Strategy ──────────────────────────────────────────────
+  # No Containerfile needed — the nginx builder assembles the image
+  # by injecting the static files into the right directory.
+  strategy:
+    type: Source
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        namespace: openshift        # OpenShift ships this builder out of the box
+        name: "nginx:latest"
+      # Place a custom nginx.conf in the source root and the S2I
+      # builder will pick it up automatically.
+
+  output:
+    to:
+      kind: ImageStreamTag
+      name: financeflow-portal:s2i-latest
+
+  triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange: {}

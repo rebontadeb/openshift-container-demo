@@ -1,0 +1,24 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: prometheus-thanos
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: financeflow
+  datasource:
+    name: Prometheus
+    type: prometheus
+    access: proxy
+    isDefault: true
+    url: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
+    jsonData:
+      httpMethod: POST
+      httpHeaderName1: Authorization
+      tlsSkipVerify: true
+    secureJsonData:
+      httpHeaderValue1: "$__env{BEARER_TOKEN}"
+  environmentFrom:
+    - secretRef:
+        name: grafana-thanos-bearer-token

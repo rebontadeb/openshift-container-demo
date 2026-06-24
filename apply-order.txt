@@ -1,0 +1,261 @@
+FinanceFlow Workshop — YAML Apply Order
+========================================
+Execute in this exact sequence. Wait for each step to be Ready before proceeding.
+
+NOTE: Chapter 06 files already point at https://github.com/rebontadeb/openshift-container-demo.git
+NOTE: Chapter 07 Grafana requires a manual token step (see Step 7c below).
+NOTE: secret-postgres.yaml, secret-github-webhook.yaml, and secret-git-credentials.yaml
+      are placeholders for documentation only (REPLACE_ME values) — create all three
+      Secrets imperatively instead, as shown below. Never `oc apply -f` them directly.
+
+
+========================================
+CHAPTER 00 — Prerequisites (cluster-admin)
+========================================
+
+    -- Install operators (see chapters/00-prerequisites/manifests/missing-operators/) --
+    oc apply -k chapters/00-prerequisites/manifests/missing-operators/
+
+01. chapters/00-prerequisites/trainer/project-template.yaml
+
+
+========================================
+CHAPTER 01 — Builds
+========================================
+
+02. chapters/01-builds/manifests/imagestream-account.yaml
+03. chapters/01-builds/manifests/imagestream-transaction.yaml
+04. chapters/01-builds/manifests/imagestream-portal.yaml
+05. chapters/01-builds/manifests/buildconfig-account.yaml
+06. chapters/01-builds/manifests/buildconfig-transaction.yaml
+07. chapters/01-builds/manifests/buildconfig-portal-docker.yaml
+    (or buildconfig-portal-s2i.yaml — use one, not both)
+
+    >> Wait: oc start-build bc/financeflow-account financeflow-transaction financeflow-portal
+    >> Wait: all builds reach "Complete"
+
+
+========================================
+CHAPTER 02 — Deployments (Services now created here, not Chapter 03)
+========================================
+
+    -- Create the postgres-credentials Secret imperatively (never commit a real password) --
+    oc create secret generic postgres-credentials \
+      --from-literal=POSTGRES_USER=financeflow \
+      --from-literal=POSTGRES_PASSWORD=<your-strong-password> \
+      --from-literal=POSTGRES_DB=financeflow \
+      --from-literal=DB_USER=financeflow \
+      --from-literal=DB_PASSWORD=<your-strong-password> \
+      --from-literal=DB_NAME=financeflow
+
+08. chapters/02-deployments/manifests/pvc-postgres.yaml
+09. chapters/02-deployments/manifests/configmap-account-service.yaml
+10. chapters/02-deployments/manifests/configmap-transaction-service.yaml
+11. chapters/02-deployments/manifests/configmap-portal-nginx.yaml
+12. chapters/02-deployments/manifests/configmap-postgres-init.yaml
+13. chapters/02-deployments/manifests/deployment-postgres.yaml
+14. chapters/02-deployments/manifests/service-postgres.yaml
+15. chapters/02-deployments/manifests/deployment-account-service.yaml
+16. chapters/02-deployments/manifests/service-account-service.yaml
+17. chapters/02-deployments/manifests/deployment-transaction-service.yaml
+18. chapters/02-deployments/manifests/service-transaction-service.yaml
+19. chapters/02-deployments/manifests/deployment-portal.yaml
+20. chapters/02-deployments/manifests/service-portal.yaml
+21. chapters/02-deployments/manifests/hpa-account-service.yaml
+
+    >> Wait: oc rollout status deployment/postgres deployment/account-service
+    >>       deployment/transaction-service deployment/portal -n financeflow-workshop
+    >>       (pods now reach 1/1 Ready — the postgres Service from step 13 is what
+    >>        makes the readiness-probe DB check succeed)
+
+
+========================================
+CHAPTER 03 — Networking (Route + NetworkPolicies only)
+========================================
+
+22. chapters/03-networking/manifests/route-portal.yaml
+23. chapters/03-networking/manifests/networkpolicy-deny-all.yaml
+24. chapters/03-networking/manifests/networkpolicy-allow-postgres.yaml
+25. chapters/03-networking/manifests/networkpolicy-allow-account-service.yaml
+26. chapters/03-networking/manifests/networkpolicy-allow-transaction-service.yaml
+27. chapters/03-networking/manifests/networkpolicy-allow-portal.yaml
+28. chapters/03-networking/manifests/networkpolicy-allow-monitoring.yaml
+
+
+========================================
+CHAPTER 04 — Security
+========================================
+
+29. chapters/04-security/manifests/scc-financeflow.yaml
+30. chapters/04-security/manifests/clusterrole-use-financeflow-scc.yaml
+31. chapters/04-security/manifests/serviceaccount-financeflow.yaml
+32. chapters/04-security/manifests/serviceaccount-cicd.yaml
+33. chapters/04-security/manifests/role-viewer.yaml
+34. chapters/04-security/manifests/role-deployer.yaml
+35. chapters/04-security/manifests/rolebinding-viewer.yaml
+36. chapters/04-security/manifests/rolebinding-deployer.yaml
+37. chapters/04-security/manifests/rolebinding-sa-use-scc.yaml
+
+
+========================================
+CHAPTER 05 — Service Mesh (OSSM 3 / Sail Operator — requires cluster-admin)
+========================================
+
+    -- Operators (OperatorHub): servicemeshoperator3, Tempo Operator, kiali-ossm --
+
+38. chapters/05-service-mesh/manifests/smcp.yaml
+    (Istio + IstioCNI, sailoperator.io/v1 — goes into istio-system/istio-cni;
+     this is NOT a ServiceMeshControlPlane — OSSM 2 is end-of-life)
+
+    >> Wait: oc get istio -n istio-system -w   (READY column should show 1)
+
+39. chapters/05-service-mesh/manifests/smmr.yaml
+    (labels financeflow-workshop with istio-injection: enabled — OSSM 3 has no
+     ServiceMeshMemberRoll)
+
+    >> Wait: oc get namespace financeflow-workshop --show-labels | grep istio-injection
+    >> Then: oc rollout restart deployment/account-service deployment/transaction-service deployment/portal
+    >> Wait: pods reach 2/2 Ready (app + Envoy sidecar)
+
+40. chapters/05-service-mesh/manifests/peerauthentication-mtls.yaml
+41. chapters/05-service-mesh/manifests/destinationrule-account-service.yaml
+42. chapters/05-service-mesh/manifests/destinationrule-transaction-service.yaml
+43. chapters/05-service-mesh/manifests/virtualservice-account-service.yaml
+44. chapters/05-service-mesh/manifests/deployment-account-service-v11.yaml
+45. chapters/05-service-mesh/manifests/kiali.yaml
+46. chapters/05-service-mesh/manifests/clusterrolebinding-kiali-monitoring.yaml
+    (without this, every Kiali graph/health request 403s against the Thanos
+     querier in openshift-monitoring — Kiali's external_services.prometheus
+     uses use_kiali_token: true, which needs cluster-monitoring-view)
+
+    -- Enable user-workload monitoring (cluster-admin, one-time) --
+    -- Required here, not just in Chapter 7: Kiali's traffic graphs (Lab 5b
+    -- onward) read istio_requests_total from Thanos, which only has data if
+    -- something is scraping the Envoy sidecars into user-workload Prometheus --
+    oc patch configmap cluster-monitoring-config -n openshift-monitoring \
+      --type=merge -p '{"data":{"config.yaml":"enableUserWorkload: true\n"}}'
+
+    >> Wait: oc get pods -n openshift-user-workload-monitoring -w
+    >>       (prometheus-user-workload-0/1 and thanos-ruler-user-workload-0 Running)
+
+    -- Grant the monitoring SA permission to scrape FinanceFlow --
+    oc adm policy add-role-to-user \
+      view \
+      system:serviceaccount:openshift-user-workload-monitoring:prometheus-user-workload \
+      -n financeflow-workshop
+
+47. chapters/05-service-mesh/manifests/podmonitor-istio-sidecar.yaml
+    (scrapes the Envoy sidecar's /stats/prometheus on port http-envoy-prom —
+     without this, Kiali graphs stay empty no matter how much traffic you
+     generate, since no istio_requests_total metric ever reaches Thanos)
+
+
+========================================
+CHAPTER 06 — CI/CD
+========================================
+
+    -- Create the GitHub webhook Secret imperatively --
+    oc create secret generic github-webhook-secret \
+      --from-literal=secret=$(openssl rand -hex 20)
+
+    -- Create the git push credentials Secret and link it to financeflow-cicd --
+    -- (needed by task-update-manifest.yaml's git-commit-push step — see
+    --  secret-git-credentials.yaml comments for why no Task/workspace change
+    --  is needed) --
+    oc create secret generic git-credentials-cicd \
+      --type=kubernetes.io/basic-auth \
+      --from-literal=username=<your-github-username> \
+      --from-literal=password=<your-github-PAT-with-repo-scope>
+    oc annotate secret git-credentials-cicd tekton.dev/git-0=https://github.com
+    oc secrets link financeflow-cicd git-credentials-cicd
+
+48. chapters/06-cicd/manifests/pvc-pipeline-source.yaml
+49. chapters/06-cicd/manifests/task-run-tests.yaml
+50. chapters/06-cicd/manifests/task-update-manifest.yaml
+51. chapters/06-cicd/manifests/pipeline-financeflow.yaml
+52. chapters/06-cicd/manifests/triggerbinding-github.yaml
+53. chapters/06-cicd/manifests/triggertemplate-financeflow.yaml
+54. chapters/06-cicd/manifests/eventlistener.yaml
+55. chapters/06-cicd/manifests/route-eventlistener.yaml
+
+    -- ArgoCD (apply after the OpenShift GitOps operator is ready) --
+56. chapters/06-cicd/manifests/argocd-project.yaml
+    (apply into openshift-gitops: oc apply -f ... -n openshift-gitops)
+57. chapters/06-cicd/manifests/argocd-app-financeflow.yaml
+    (apply into openshift-gitops: oc apply -f ... -n openshift-gitops)
+
+    -- Trigger a pipeline run manually --
+58. chapters/06-cicd/manifests/pipelinerun-account-service.yaml
+    (use `oc create -f`, not `oc apply -f` — generateName creates a new object each time)
+59. chapters/06-cicd/manifests/pipelinerun-transaction-service.yaml
+    (use `oc create -f`, not `oc apply -f`)
+
+
+========================================
+CHAPTER 07 — Observability
+========================================
+
+    -- Step 7a: User workload monitoring was already enabled in Chapter 5 --
+    -- (Kiali's traffic graphs need the same Thanos metrics pipeline, so it's
+    --  set up there now — see Chapter 05 above. Nothing to do here.) --
+
+    -- Step 7b: Install Grafana Operator (cluster-admin) --
+60. chapters/07-observability/manifests/grafana/namespace.yaml
+61. chapters/07-observability/manifests/grafana/operatorgroup.yaml
+62. chapters/07-observability/manifests/grafana/subscription.yaml
+63. chapters/07-observability/manifests/grafana/serviceaccount.yaml
+
+    >> Wait: oc wait --for=condition=Ready pods -l control-plane=controller-manager \
+             -n grafana --timeout=120s
+
+    -- Step 7c: Generate Thanos bearer token (one-time manual step) --
+    TOKEN=$(oc create token grafana-sa -n grafana --duration=8760h)
+    oc create secret generic grafana-thanos-bearer-token \
+      --from-literal=BEARER_TOKEN="Bearer $TOKEN" \
+      -n grafana --dry-run=client -o yaml | oc apply -f -
+
+    -- Step 7d: Deploy Grafana instance and dashboards --
+64. chapters/07-observability/manifests/grafana/grafana.yaml
+
+    >> Wait: oc wait --for=condition=GrafanaReady grafana/financeflow-grafana \
+             -n grafana --timeout=120s
+
+65. chapters/07-observability/manifests/grafana/datasource.yaml
+66. chapters/07-observability/manifests/grafana/route.yaml
+67. chapters/07-observability/manifests/grafana/dashboard-service-mesh.yaml
+
+    -- Step 7e: App metrics and alerting --
+68. chapters/07-observability/manifests/servicemonitor-account-service.yaml
+69. chapters/07-observability/manifests/servicemonitor-transaction-service.yaml
+    (istio-sidecar-metrics PodMonitor was applied in Chapter 5, step 47 — not repeated here)
+70. chapters/07-observability/manifests/prometheusrule-financeflow.yaml
+
+    -- Step 7f: Tempo + OpenTelemetry (requires Tempo Operator [Ch.5] and OTel Operator) --
+71. chapters/07-observability/manifests/tempo.yaml
+    (TempoMonolithic — deploy before the Collector, which sends traces here)
+
+    >> Wait: oc get pods -l app.kubernetes.io/managed-by=tempo-operator
+    >> Wait: oc get route tempo-financeflow-jaegerui
+
+72. chapters/07-observability/manifests/otel-collector.yaml
+73. chapters/07-observability/manifests/servicemonitor-otel-collector.yaml
+
+    -- Step 7g: Trace generation (Lab 7c — instrument app.py with the OTel SDK first) --
+74. chapters/07-observability/manifests/grafana-dashboard-configmap.yaml
+
+
+========================================
+KUSTOMIZE SHORTCUTS (apply entire chapter at once)
+========================================
+
+Chapter 02:  oc apply -k chapters/02-deployments/manifests/
+             (postgres-credentials Secret must already exist — see Chapter 02 above)
+Chapter 03:  oc apply -k chapters/03-networking/manifests/
+Chapter 04:  oc apply -k chapters/04-security/manifests/
+Chapter 05:  oc apply -k chapters/05-service-mesh/manifests/
+             (smcp.yaml and smmr.yaml must be applied separately first)
+Chapter 06:  oc apply -k chapters/06-cicd/manifests/
+             (github-webhook-secret must already exist — see Chapter 06 above)
+Chapter 07:  oc apply -k chapters/07-observability/manifests/grafana/
+             (grafana-thanos-bearer-token must already exist — see Step 7c above)
+             oc apply -k chapters/07-observability/manifests/

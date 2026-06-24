@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: portal-nginx-conf
+  namespace: financeflow-workshop
+  labels:
+    app: financeflow
+    tier: portal
+data:
+  default.conf: |
+    server {
+        listen       8080;
+        server_name  _;
+
+        root  /usr/share/nginx/html;
+        index index.html;
+
+        location /api/accounts {
+            proxy_pass         http://account-service:8080;
+            proxy_http_version 1.1;
+            proxy_set_header   Connection        "";
+            proxy_set_header   Host              $proxy_host;
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_read_timeout 10s;
+        }
+
+        location /api/transactions {
+            proxy_pass         http://transaction-service:8080;
+            proxy_http_version 1.1;
+            proxy_set_header   Connection        "";
+            proxy_set_header   Host              $proxy_host;
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_read_timeout 10s;
+        }
+
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        location /health {
+            access_log off;
+            return 200 '{"status":"ok","service":"portal"}';
+            add_header Content-Type application/json;
+        }
+
+        error_page 502 503 504 /50x.html;
+        location = /50x.html {
+            root /usr/share/nginx/html;
+        }
+    }
