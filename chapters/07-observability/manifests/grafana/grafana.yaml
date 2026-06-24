@@ -29,11 +29,14 @@ spec:
               # datasource directly via Grafana's API instead.
               # 256Mi was too low — confirmed live, container hit OOMKilled
               # (exit code 137) repeatedly under normal operation, not just
-              # under load.
+              # under load. 512Mi still wasn't enough headroom: a freshly
+              # started pod sat at 491Mi/512Mi (measured via oc adm top pod)
+              # within minutes, idle, with one datasource and one dashboard —
+              # about to OOM again.
               resources:
                 requests:
                   cpu: 100m
-                  memory: 256Mi
+                  memory: 512Mi
                 limits:
                   cpu: 500m
-                  memory: 512Mi
+                  memory: 1Gi
