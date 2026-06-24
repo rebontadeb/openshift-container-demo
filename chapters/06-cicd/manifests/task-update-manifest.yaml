@@ -25,6 +25,10 @@ spec:
     - name: git-user-email
       type: string
       default: "pipeline@financeflow-workshop"
+    - name: git-branch
+      type: string
+      default: "main"
+      description: Branch to push the commit to
   workspaces:
     - name: source
       description: Cloned source repository (with write access via git credentials)
@@ -74,5 +78,9 @@ spec:
         git commit -m "ci: update $(params.service) image to $(params.image-tag)" || \
           echo "No changes to commit"
 
-        git push origin HEAD
+        # git-clone leaves the workspace in detached HEAD state (normal for
+        # CI checkouts) — `git push origin HEAD` can't resolve a destination
+        # ref from a commit object with no branch name attached, so the
+        # branch must be spelled out explicitly on the remote side.
+        git push origin HEAD:refs/heads/$(params.git-branch)
         echo "Pushed — ArgoCD will detect and sync"
