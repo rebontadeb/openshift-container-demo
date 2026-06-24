@@ -13,6 +13,9 @@ spec:
     - name: service
       type: string
       description: "Deployment name to update: account-service, transaction-service, portal"
+    - name: image-name
+      type: string
+      description: "ImageStream name: financeflow-account, financeflow-transaction, financeflow-portal"
     - name: image-tag
       type: string
       description: New image tag (typically the git short SHA from the build step)
@@ -34,15 +37,14 @@ spec:
         set -euo pipefail
 
         MANIFEST="chapters/02-deployments/manifests/deployment-$(params.service).yaml"
+        IMAGE_NAME="$(params.image-name)"
         NEW_TAG="$(params.image-tag)"
-        SERVICE="$(params.service)"
 
-        echo "Updating $MANIFEST → image tag: $NEW_TAG"
+        echo "Updating $MANIFEST → image: ${IMAGE_NAME}:${NEW_TAG}"
 
         # Replace the image tag in the Deployment YAML
-        # Matches pattern: image: financeflow-<name>:<tag>
-        sed -i "s|financeflow-[^:]*:v[0-9.]*|financeflow-${SERVICE#*financeflow-}:${NEW_TAG}|g" "$MANIFEST" || \
-        sed -i "s|image: .*financeflow.*|image: financeflow-${SERVICE}:${NEW_TAG}|g" "$MANIFEST"
+        # Matches pattern: image: <any-image-name>:<tag>
+        sed -i "s|image: .*$|image: ${IMAGE_NAME}:${NEW_TAG}|" "$MANIFEST"
 
         echo "Updated manifest:"
         grep "image:" "$MANIFEST"
@@ -51,8 +53,9 @@ spec:
       image: alpine/git:latest
       workingDir: $(workspaces.source.path)
       script: |
-        #!/usr/bin/env bash
-        set -euo pipefail
+        #!/bin/sh
+        # alpine/git has no bash — only POSIX sh (no `pipefail`)
+        set -eu
 
         git config user.name  "$(params.git-user-name)"
         git config user.email "$(params.git-user-email)"

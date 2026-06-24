@@ -131,6 +131,8 @@ spec:
       params:
         - name: service
           value: $(params.service)
+        - name: image-name
+          value: $(params.image-name)
         - name: image-tag
           value: $(params.image-tag)
 
