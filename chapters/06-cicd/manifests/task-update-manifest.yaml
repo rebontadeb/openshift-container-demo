@@ -57,6 +57,14 @@ spec:
         # alpine/git has no bash — only POSIX sh (no `pipefail`)
         set -eu
 
+        # The clone step's container runs as a different UID than this one
+        # (different Task = different pod, same shared PVC workspace) — git
+        # refuses to trust a repo it doesn't own unless told otherwise, and
+        # reports the confusing "not in a git directory" for non-global
+        # commands when it does (git status shows the real reason: "detected
+        # dubious ownership").
+        git config --global --add safe.directory "$(workspaces.source.path)"
+
         git config user.name  "$(params.git-user-name)"
         git config user.email "$(params.git-user-email)"
 
