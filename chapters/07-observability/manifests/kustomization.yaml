@@ -17,6 +17,5 @@ resources:
   - otel-collector.yaml
   - servicemonitor-account-service.yaml
   - servicemonitor-transaction-service.yaml
-  - servicemonitor-otel-collector.yaml
   - prometheusrule-financeflow.yaml
   - grafana/

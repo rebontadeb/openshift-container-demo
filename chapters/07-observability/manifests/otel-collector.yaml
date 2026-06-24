@@ -17,15 +17,21 @@ spec:
           http:
             endpoint: 0.0.0.0:4318
 
-      prometheus:
-        config:
-          scrape_configs:
-            - job_name: financeflow-services
-              scrape_interval: 30s
-              static_configs:
-                - targets:
-                    - account-service:8080
-                    - transaction-service:8080
+      # There was a `prometheus` receiver here scraping account-service:8080
+      # and transaction-service:8080 directly, re-exporting them on :8889
+      # under a "financeflow_" prefix. Removed: it duplicated metrics
+      # already correctly scraped via servicemonitor-account-service.yaml /
+      # servicemonitor-transaction-service.yaml straight into Thanos (what
+      # Grafana, Kiali, and prometheusrule-financeflow.yaml all actually
+      # use) — and nothing in this repo ever consumed the duplicate. It was
+      # also broken: no NetworkPolicy allows the collector pod (source) to
+      # reach account-service/transaction-service on port 8080 — only
+      # openshift-monitoring/openshift-user-workload-monitoring are allowed
+      # in (see networkpolicy-allow-monitoring.yaml). Confirmed live via
+      # Kiali: 100% error rate on that outbound traffic (response_code "0"
+      # — connection-level failure, no HTTP response at all), which is what
+      # actually shows up as "red"/Failure on the financeflow-collector
+      # workload in the graph.
 
     processors:
       batch:
@@ -47,10 +53,6 @@ spec:
       debug:
         verbosity: normal
 
-      prometheus:
-        endpoint: 0.0.0.0:8889
-        namespace: financeflow
-
       otlp/tempo:
         endpoint: tempo-financeflow:4317
         tls:
@@ -62,8 +64,3 @@ spec:
           receivers:  [otlp]
           processors: [memory_limiter, resource, batch]
           exporters:  [debug, otlp/tempo]
-
-        metrics:
-          receivers:  [otlp, prometheus]
-          processors: [memory_limiter, batch]
-          exporters:  [prometheus]

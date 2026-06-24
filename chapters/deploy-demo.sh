@@ -341,9 +341,8 @@ for i in $(seq 1 20); do
   sleep 10
 done
 
-step "Deploy the OTel Collector and its ServiceMonitor"
+step "Deploy the OTel Collector"
 oc apply -f 07-observability/manifests/otel-collector.yaml
-oc apply -f 07-observability/manifests/servicemonitor-otel-collector.yaml
 
 step "Apply the FinanceFlow overview dashboard (GrafanaDashboard CR, not a sidecar-discovered ConfigMap)"
 oc apply -f 07-observability/manifests/dashboard-financeflow-overview.yaml

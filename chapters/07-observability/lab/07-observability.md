@@ -219,9 +219,17 @@ oc rollout status deployment/transaction-service
 ```bash
 oc apply -f chapters/07-observability/manifests/servicemonitor-account-service.yaml
 oc apply -f chapters/07-observability/manifests/servicemonitor-transaction-service.yaml
-oc apply -f chapters/07-observability/manifests/servicemonitor-otel-collector.yaml
 oc get servicemonitor
 ```
+
+> There's no `servicemonitor-otel-collector.yaml` step — it scraped a
+> metrics pipeline on the Collector (:8889) that was removed from
+> `otel-collector.yaml`. It duplicated these same two ServiceMonitors'
+> metrics and was blocked by a NetworkPolicy gap besides (no rule allowed
+> the Collector to reach account-service/transaction-service on :8080 —
+> only the cluster's own monitoring namespaces were allowed in). Confirmed
+> live via Kiali: the `financeflow-collector` workload showed `errorRatio:
+> 100, status: "Failure"` because of this exact dead, broken path.
 
 ### Step 2 — Verify scraping in the Prometheus UI
 

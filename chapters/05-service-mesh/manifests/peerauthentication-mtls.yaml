@@ -35,11 +35,6 @@ spec:
   # reports 0 forever, easy to mistake for an app-level metrics bug. 15090
   # (Envoy's own stats port, used by the Chapter 5 istio-sidecar-metrics
   # PodMonitor) is unaffected since Envoy serves it directly, unproxied.
-  #
-  # Port 8889 is the OTel Collector's Prometheus re-export port (Chapter 7's
-  # otel-collector.yaml carries app: financeflow too, so it's covered by this
-  # same selector) — servicemonitor-otel-collector.yaml hit the identical
-  # up=0 symptom for the identical reason.
   selector:
     matchLabels:
       app: financeflow
@@ -47,6 +42,4 @@ spec:
     mode: STRICT
   portLevelMtls:
     "8080":
-      mode: PERMISSIVE
-    "8889":
       mode: PERMISSIVE
