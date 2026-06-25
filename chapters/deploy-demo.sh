@@ -395,7 +395,21 @@ oc apply -f 07-observability/manifests/grafana/namespace.yaml
 oc apply -f 07-observability/manifests/grafana/operatorgroup.yaml
 oc apply -f 07-observability/manifests/grafana/subscription.yaml
 oc apply -f 07-observability/manifests/grafana/serviceaccount.yaml
-oc wait --for=condition=Ready pods -l control-plane=controller-manager -n grafana --timeout=180s
+# `oc wait` errors immediately with "no matching resources found" if zero
+# pods match the selector *right now* — it doesn't poll for one to appear.
+# OLM hasn't installed the CSV/Deployment yet straight after the Subscription
+# is applied, so the operator pod doesn't exist for a bit. Poll for at least
+# one matching pod first, then hand off to oc wait for readiness.
+# Label is app.kubernetes.io/name=grafana-operator on grafana-operator v5
+# (community-operators) — NOT control-plane=controller-manager, which this
+# operator's pod has never carried; that selector would never match at all.
+echo "    waiting for the grafana-operator pod to be created..."
+for i in $(seq 1 24); do
+  pod_count=$(oc get pods -n grafana -l app.kubernetes.io/name=grafana-operator --no-headers 2>/dev/null | wc -l)
+  [ "$pod_count" -gt 0 ] && break
+  sleep 10
+done
+oc wait --for=condition=Ready pods -l app.kubernetes.io/name=grafana-operator -n grafana --timeout=180s
 
 step "Generate the Thanos bearer token Secret for Grafana"
 TOKEN=$(oc create token grafana-sa -n grafana --duration=8760h)
