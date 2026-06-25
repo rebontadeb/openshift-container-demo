@@ -167,8 +167,19 @@ if [ "$WITH_OPERATORS" = true ]; then
   done
 
   step "Disable the Pipelines and GitOps console plugins"
-  oc patch console.operator.openshift.io cluster --type=json \
-    -p '[{"op": "remove", "path": "/spec/plugins"}]' 2>/dev/null || true
+  # Remove only these two entries — spec.plugins is a shared cluster-wide
+  # list (e.g. odf-console, monitoring-plugin, networking-console-plugin
+  # may already be there for unrelated reasons). A blind
+  # {"op":"remove","path":"/spec/plugins"} wipes the whole array and would
+  # silently break those other plugins too.
+  current=$(oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}' 2>/dev/null || echo "[]")
+  filtered=$(echo "$current" | python3 -c "
+import json, sys
+plugins = json.loads(sys.stdin.read() or '[]')
+plugins = [p for p in plugins if p not in ('pipelines-console-plugin', 'gitops-plugin')]
+print(json.dumps(plugins))
+")
+  oc patch console.operator.openshift.io cluster --type=merge -p "{\"spec\":{\"plugins\":$filtered}}"
   echo "    (re-run prepare-cluster.sh's plugin steps if other workloads still need them)"
 else
   echo
