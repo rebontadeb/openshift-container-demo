@@ -353,6 +353,8 @@ oc apply -f 06-cicd/manifests/peerauthentication-webhook-ingress-permissive.yaml
 step "Apply the ArgoCD AppProject and Application (into openshift-gitops)"
 oc apply -f 06-cicd/manifests/argocd-project.yaml -n openshift-gitops
 oc apply -f 06-cicd/manifests/argocd-app-financeflow.yaml -n openshift-gitops
+echo "    ArgoCD: https://$(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}' 2>/dev/null)"
+echo "    ArgoCD admin password: $(oc extract secret/openshift-gitops-cluster -n openshift-gitops --to=- --keys=admin.password 2>/dev/null)"
 
 step "Trigger a manual PipelineRun for account-service (proves the pipeline before relying on the webhook)"
 oc create -f 06-cicd/manifests/pipelinerun-account-service.yaml
