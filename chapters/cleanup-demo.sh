@@ -43,6 +43,39 @@ step() {
 
 ok() { echo "    ✓ $1"; }
 
+# Delete a namespace and actually wait for it to disappear. If it's still
+# Terminating after a grace period, the cause is almost always a CR that's
+# still carrying an operator's finalizer (e.g. operator.grafana.com/finalizer)
+# after that operator's own pod/CSV has already been removed as part of the
+# same teardown — nothing is left to process the finalizer, so the namespace
+# would otherwise hang forever. Scan for and clear any such finalizers, then
+# give it one more grace period before giving up.
+force_delete_namespace() {
+  local ns="$1"
+  oc delete namespace "$ns" --ignore-not-found
+  for i in $(seq 1 12); do
+    oc get namespace "$ns" >/dev/null 2>&1 || { ok "$ns namespace gone"; return 0; }
+    echo "    ... $ns still terminating"
+    sleep 10
+  done
+
+  echo "    $ns still terminating after 120s — checking for stuck finalizers"
+  local cleared=false
+  for gvk in $(oc api-resources --verbs=list --namespaced -o name 2>/dev/null); do
+    for name in $(oc get "$gvk" -n "$ns" -o jsonpath='{range .items[?(@.metadata.finalizers)]}{.metadata.name}{"\n"}{end}' 2>/dev/null); do
+      echo "    clearing finalizers on $gvk/$name in $ns"
+      oc patch "$gvk" "$name" -n "$ns" --type=merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null && cleared=true
+    done
+  done
+  [ "$cleared" = false ] && echo "    no resources with finalizers found — namespace may just need more time"
+
+  for i in $(seq 1 12); do
+    oc get namespace "$ns" >/dev/null 2>&1 || { ok "$ns namespace gone"; return 0; }
+    sleep 10
+  done
+  echo "    ⚠ $ns namespace still present — inspect manually: oc get namespace $ns -o yaml"
+}
+
 # ── Destructive-action gate (separate from the per-step pause) ─────────────
 echo "════════════════════════════════════════════════════════════════════"
 echo " This will DELETE the FinanceFlow workshop deployment:"
@@ -90,15 +123,15 @@ for i in $(seq 1 20); do
 done
 
 step "Delete the istio-system and istio-cni namespaces"
-oc delete namespace istio-system --ignore-not-found
-oc delete namespace istio-cni --ignore-not-found
+force_delete_namespace istio-system
+force_delete_namespace istio-cni
 
 # ──────────────────────────────────────────────────────────────────────────
 # Observability
 # ──────────────────────────────────────────────────────────────────────────
 
 step "Delete the grafana namespace (Grafana instance, datasource, dashboards, operator subscription)"
-oc delete namespace grafana --ignore-not-found
+force_delete_namespace grafana
 
 # ──────────────────────────────────────────────────────────────────────────
 # The main app namespace — cascades through almost everything else:
@@ -107,15 +140,8 @@ oc delete namespace grafana --ignore-not-found
 # the EventListener, and the HPA.
 # ──────────────────────────────────────────────────────────────────────────
 
-step "Delete the $NAMESPACE namespace"
-oc delete namespace "$NAMESPACE" --ignore-not-found
-
-step "Wait for $NAMESPACE to fully terminate"
-for i in $(seq 1 30); do
-  oc get namespace "$NAMESPACE" >/dev/null 2>&1 || { ok "namespace gone"; break; }
-  echo "    ... still terminating"
-  sleep 10
-done
+step "Delete the $NAMESPACE namespace (and wait for it to fully terminate)"
+force_delete_namespace "$NAMESPACE"
 
 # ──────────────────────────────────────────────────────────────────────────
 # Cluster-scoped leftovers — not owned by any namespace, so namespace
