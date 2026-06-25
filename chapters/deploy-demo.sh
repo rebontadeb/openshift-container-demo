@@ -224,6 +224,41 @@ oc adm policy add-role-to-user \
   -n "$NAMESPACE"
 oc apply -f 05-service-mesh/manifests/podmonitor-istio-sidecar.yaml
 
+step "Wait for the Kiali dashboard to come up"
+oc rollout status deployment/kiali -n istio-system --timeout=180s
+KIALI_HOST=""
+for i in $(seq 1 18); do
+  KIALI_HOST=$(oc get route kiali -n istio-system -o jsonpath='{.spec.host}' 2>/dev/null || true)
+  if [ -n "$KIALI_HOST" ]; then
+    CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://$KIALI_HOST/" || true)
+    # auth strategy is "openshift" — a redirect to the OAuth login is expected,
+    # not a 200; "000" is the only real failure (route not yet reachable)
+    if [ "$CODE" != "000" ]; then
+      ok "Kiali dashboard reachable at https://$KIALI_HOST (HTTP $CODE)"
+      break
+    fi
+  fi
+  echo "    ... waiting for Kiali route ($i/18)"
+  sleep 10
+done
+
+step "Generate traffic so the mesh has something to report"
+oc exec deployment/portal -n "$NAMESPACE" -- sh -c \
+  "for i in \$(seq 1 60); do wget -qO- http://account-service:8080/api/accounts >/dev/null 2>&1; sleep 0.2; done"
+
+step "Verify istio_requests_total metrics reached Thanos (the same data Kiali's graph reads)"
+KIALI_TOKEN=$(oc create token kiali-service-account -n istio-system --duration=10m)
+METRIC_RESULT=$(oc exec deployment/portal -n "$NAMESPACE" -- wget -qO- \
+  --no-check-certificate \
+  --header="Authorization: Bearer $KIALI_TOKEN" \
+  "https://thanos-querier.openshift-monitoring.svc.cluster.local:9091/api/v1/query?query=istio_requests_total%7Bdestination_service_name%3D%22account-service%22%2Cdestination_service_namespace%3D%22$NAMESPACE%22%7D" 2>/dev/null || true)
+if echo "$METRIC_RESULT" | grep -q '"result":\[{'; then
+  ok "istio_requests_total samples found for account-service — Kiali's graph will show traffic"
+else
+  echo "    ⚠ No istio_requests_total samples yet for account-service."
+  echo "      Scrape interval is 15s — wait ~30-60s and re-check before assuming the PodMonitor/RBAC steps above failed."
+fi
+
 # ──────────────────────────────────────────────────────────────────────────
 # Chapter 6 — CI/CD
 # ──────────────────────────────────────────────────────────────────────────

@@ -155,6 +155,27 @@ CHAPTER 05 — Service Mesh (OSSM 3 / Sail Operator — requires cluster-admin)
      without this, Kiali graphs stay empty no matter how much traffic you
      generate, since no istio_requests_total metric ever reaches Thanos)
 
+    >> Wait: oc rollout status deployment/kiali -n istio-system --timeout=180s
+    >>       then poll `oc get route kiali -n istio-system` until the host
+    >>       responds (auth strategy: openshift, so expect a redirect to the
+    >>       OAuth login, not a 200 — any response besides connection-refused
+    >>       means the pod is up)
+
+    -- Generate traffic so there's something for the graph to show --
+    oc exec deployment/portal -n financeflow-workshop -- sh -c \
+      "for i in \$(seq 1 60); do wget -qO- http://account-service:8080/api/accounts >/dev/null 2>&1; sleep 0.2; done"
+
+    -- Verify istio_requests_total actually reached Thanos (the exact metric
+       Kiali's graph reads — checking here instead of trusting the UI catches
+       a silent PodMonitor/RBAC failure immediately instead of after the fact) --
+    oc exec deployment/portal -n financeflow-workshop -- wget -qO- \
+      --no-check-certificate \
+      --header="Authorization: Bearer $(oc create token kiali-service-account -n istio-system --duration=10m)" \
+      'https://thanos-querier.openshift-monitoring.svc.cluster.local:9091/api/v1/query?query=istio_requests_total%7Bdestination_service_name%3D%22account-service%22%2Cdestination_service_namespace%3D%22financeflow-workshop%22%7D'
+    -- expect "result":[{...}] with at least one element; "result":[] means
+       either no traffic reached the sidecar yet or the PodMonitor/RBAC step
+       above didn't take — re-check before moving on --
+
 
 ========================================
 CHAPTER 06 — CI/CD
