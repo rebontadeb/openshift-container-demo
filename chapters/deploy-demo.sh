@@ -91,6 +91,30 @@ oc start-build financeflow-transaction --from-dir=../app/transaction-service --f
 step "Build and push financeflow-portal:v1.0"
 oc start-build financeflow-portal --from-dir=../app/portal --follow
 
+step "Pin Chapter 2 manifests to the freshly-built :v1.0 tag"
+# CI's update-manifest task (Chapter 6) rewrites these two files to a full
+# git-SHA tag on every webhook-triggered build. That SHA only ever exists in
+# the registry of whatever cluster built it — on a fresh cluster the tag is
+# gone, so if git happens to be sitting on a SHA commit from a previous
+# cluster's life when this runs, the apply below pulls a nonexistent image.
+# Force both back to :v1.0 (what was just built, above) and push immediately,
+# so git matches the live cluster *before* Chapter 6 creates the ArgoCD
+# Application — otherwise selfHeal re-applies the stale tag the moment it syncs.
+sed -i "s|image: financeflow-account:.*|image: financeflow-account:v1.0|" \
+  02-deployments/manifests/deployment-account-service.yaml
+sed -i "s|image: financeflow-transaction:.*|image: financeflow-transaction:v1.0|" \
+  02-deployments/manifests/deployment-transaction-service.yaml
+if ! git -C .. diff --quiet -- chapters/02-deployments/manifests/deployment-account-service.yaml \
+                                  chapters/02-deployments/manifests/deployment-transaction-service.yaml; then
+  git -C .. add chapters/02-deployments/manifests/deployment-account-service.yaml \
+                chapters/02-deployments/manifests/deployment-transaction-service.yaml
+  git -C .. commit -m "ci: pin account/transaction-service to v1.0 for fresh-cluster deploy [skip ci]"
+  git -C .. push origin HEAD:refs/heads/main
+  ok "pinned to v1.0 and pushed — git now matches what was just built"
+else
+  ok "manifests already pinned to v1.0"
+fi
+
 # ──────────────────────────────────────────────────────────────────────────
 # Chapter 2 — Deployments
 # ──────────────────────────────────────────────────────────────────────────
