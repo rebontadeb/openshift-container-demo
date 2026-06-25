@@ -281,6 +281,22 @@ fi
 # Chapter 6 — CI/CD
 # ──────────────────────────────────────────────────────────────────────────
 
+step "Ensure the Pipelines and GitOps console plugins are enabled (prepare-cluster.sh should have done this — re-checked here since a missed/lost patch leaves the Pipelines tab and ArgoCD apps silently absent from the console, with no error anywhere)"
+plugins=$(oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}' 2>/dev/null || true)
+if echo "$plugins" | grep -q "pipelines-console-plugin"; then
+  ok "pipelines-console-plugin already enabled"
+else
+  oc patch console.operator.openshift.io cluster --type=json \
+    -p '[{"op": "add", "path": "/spec/plugins/-", "value": "pipelines-console-plugin"}]'
+fi
+plugins=$(oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}' 2>/dev/null || true)
+if echo "$plugins" | grep -q "gitops-plugin"; then
+  ok "gitops-plugin already enabled"
+else
+  oc patch console.operator.openshift.io cluster --type=json \
+    -p '[{"op": "add", "path": "/spec/plugins/-", "value": "gitops-plugin"}]'
+fi
+
 step "Grant financeflow-cicd permission to push images and run buildah"
 oc adm policy add-role-to-user \
   registry-editor \
