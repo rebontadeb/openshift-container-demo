@@ -293,6 +293,7 @@ fi
 
 if step "portal route"; then
   oc apply -f 03-networking/manifests/route-portal.yaml
+  echo "    Portal: https://$(oc get route portal -n "$NAMESPACE" -o jsonpath='{.spec.host}' 2>/dev/null)"
 fi
 
 if step "networkpolicies"; then
