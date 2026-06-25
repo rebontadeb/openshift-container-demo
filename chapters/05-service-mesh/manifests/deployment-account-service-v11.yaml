@@ -7,6 +7,10 @@ metadata:
     app: financeflow
     tier: account-service
     version: v1.1
+  annotations:
+    # Same dependency as the stable Deployment — drives the Topology view's
+    # connector arrows for the canary pod.
+    app.openshift.io/connects-to: '["postgres"]'
 spec:
   replicas: 1    # one canary pod alongside the two stable pods
   selector:

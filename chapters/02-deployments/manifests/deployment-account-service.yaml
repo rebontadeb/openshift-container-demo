@@ -10,6 +10,9 @@ metadata:
     # Triggers a rollout when the referenced Secret or ConfigMap changes
     secret.reloader.stakater.com/reload: "postgres-credentials"
     configmap.reloader.stakater.com/reload: "account-service-config"
+    # Drives the Topology view's connector arrows — account-service talks
+    # to postgres directly (DB_HOST=postgres in account-service-config).
+    app.openshift.io/connects-to: '["postgres"]'
 spec:
   replicas: 2              # minimum 2 for financial services — never go to 0
   selector:

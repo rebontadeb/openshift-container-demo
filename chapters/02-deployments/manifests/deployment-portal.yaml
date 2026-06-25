@@ -6,6 +6,10 @@ metadata:
   labels:
     app: financeflow
     tier: portal
+  annotations:
+    # Drives the Topology view's connector arrows — portal proxies both
+    # /api/accounts and /api/transactions (see portal-nginx-conf).
+    app.openshift.io/connects-to: '["account-service","transaction-service"]'
 spec:
   replicas: 3
   selector:

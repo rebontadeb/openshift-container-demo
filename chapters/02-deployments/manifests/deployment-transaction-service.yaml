@@ -9,6 +9,10 @@ metadata:
   annotations:
     secret.reloader.stakater.com/reload: "postgres-credentials"
     configmap.reloader.stakater.com/reload: "transaction-service-config"
+    # Drives the Topology view's connector arrows — transaction-service
+    # calls account-service (ACCOUNT_SERVICE_URL, balance get/update) and
+    # postgres directly (DB_HOST=postgres in transaction-service-config).
+    app.openshift.io/connects-to: '["account-service","postgres"]'
 spec:
   replicas: 2
   selector:
