@@ -36,7 +36,7 @@ spec:
       serviceAccountName: financeflow-app
       containers:
         - name: account-service
-          image: financeflow-account:b35dbd0fa1ce4041ff7208bef792d51966b721e7
+          image: financeflow-account:f33b12c66fb67112f68f33fb636c170508021317
           imagePullPolicy: Always
           ports:
             - name: http
