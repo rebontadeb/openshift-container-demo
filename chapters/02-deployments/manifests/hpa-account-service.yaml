@@ -12,7 +12,7 @@ spec:
     kind: Deployment
     name: account-service
   minReplicas: 2    # never below 2 — financial service must stay available
-  maxReplicas: 8
+  maxReplicas: 4
   metrics:
     - type: Resource
       resource:
