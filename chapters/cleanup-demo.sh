@@ -130,7 +130,18 @@ force_delete_namespace istio-cni
 # Observability
 # ──────────────────────────────────────────────────────────────────────────
 
-step "Delete the grafana namespace (Grafana instance, datasource, dashboards, operator subscription)"
+step "Delete the Grafana CRs while the operator is still running"
+# Root cause of the recurring stuck-namespace deadlock: oc delete namespace
+# grafana doesn't guarantee these CRs' operator.grafana.com/finalizer gets
+# processed before the namespace controller also tears down the
+# grafana-operator pod that's the only thing able to clear it — same race
+# Kiali/Istio's CRs avoid above by being deleted (and waited on) before their
+# namespace, while the operator is still alive to process the finalizer.
+oc delete grafana --all -n grafana --ignore-not-found --timeout=60s 2>/dev/null || true
+oc delete grafanadashboards.grafana.integreatly.org --all -n grafana --ignore-not-found --timeout=60s 2>/dev/null || true
+oc delete grafanadatasources.grafana.integreatly.org --all -n grafana --ignore-not-found --timeout=60s 2>/dev/null || true
+
+step "Delete the grafana namespace (operator subscription, etc.)"
 force_delete_namespace grafana
 
 # ──────────────────────────────────────────────────────────────────────────
