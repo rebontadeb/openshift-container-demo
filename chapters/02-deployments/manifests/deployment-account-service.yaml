@@ -12,7 +12,7 @@ metadata:
     configmap.reloader.stakater.com/reload: "account-service-config"
     # Drives the Topology view's connector arrows — account-service talks
     # to postgres directly (DB_HOST=postgres in account-service-config).
-    app.openshift.io/connects-to: '["postgres"]'
+    app.openshift.io/connects-to: '["postgres","postgres-vm"]'
 spec:
   replicas: 2              # minimum 2 for financial services — never go to 0
   selector:

@@ -12,7 +12,7 @@ metadata:
     # Drives the Topology view's connector arrows — transaction-service
     # calls account-service (ACCOUNT_SERVICE_URL, balance get/update) and
     # postgres directly (DB_HOST=postgres in transaction-service-config).
-    app.openshift.io/connects-to: '["account-service","postgres"]'
+    app.openshift.io/connects-to: '["account-service","postgres","postgres-vm"]'
 spec:
   replicas: 2
   selector:
