@@ -217,6 +217,24 @@ step "Deploy Kiali and grant it cluster-monitoring-view"
 oc apply -f 05-service-mesh/manifests/kiali.yaml
 oc apply -f 05-service-mesh/manifests/clusterrolebinding-kiali-monitoring.yaml
 
+step "Ensure user-workload monitoring is enabled (prepare-cluster.sh should have done this — re-checked here since a missing ConfigMap fails silently otherwise)"
+if oc get configmap cluster-monitoring-config -n openshift-monitoring >/dev/null 2>&1; then
+  oc patch configmap cluster-monitoring-config -n openshift-monitoring \
+    --type=merge -p '{"data":{"config.yaml":"enableUserWorkload: true\n"}}'
+else
+  oc create configmap cluster-monitoring-config -n openshift-monitoring \
+    --from-literal=config.yaml="enableUserWorkload: true"
+fi
+for i in $(seq 1 20); do
+  status=$(oc get pods -n openshift-user-workload-monitoring 2>&1)
+  if echo "$status" | grep -q "prometheus-user-workload" && ! echo "$status" | grep -qv "Running\|NAME"; then
+    ok "user-workload monitoring is up"
+    break
+  fi
+  echo "    ... waiting for prometheus-user-workload / thanos-ruler-user-workload"
+  sleep 10
+done
+
 step "Grant the monitoring SA permission to scrape this namespace, apply the istio-sidecar-metrics PodMonitor"
 oc adm policy add-role-to-user \
   view \
