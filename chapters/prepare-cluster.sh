@@ -44,10 +44,10 @@ oc auth can-i '*' '*' --all-namespaces >/dev/null 2>&1 \
   || { echo "    ✗ Not cluster-admin — this script needs it (operators, console plugins, monitoring config)."; exit 1; }
 
 # ── Step: install operators ──────────────────────────────────────────────────
-step "Install missing operators (Pipelines, GitOps, Service Mesh 3, Tempo, Kiali, OpenTelemetry)"
+step "Install missing operators (Pipelines, GitOps, Service Mesh 3, Tempo, Kiali, OpenTelemetry, OpenShift Virtualization)"
 oc apply -k 00-prerequisites/manifests/missing-operators/
 
-step "Wait for all 6 operator CSVs to reach Succeeded"
+step "Wait for all 6 openshift-operators CSVs to reach Succeeded"
 for i in $(seq 1 30); do
   pending=$(oc get csv -n openshift-operators -o json 2>/dev/null \
     | python3 -c "
@@ -67,6 +67,36 @@ print('\n'.join(pending))
   sleep 15
 done
 oc get csv -n openshift-operators | grep -iE "pipelines|gitops|servicemesh|tempo|kiali|opentelemetry"
+
+step "Wait for the OpenShift Virtualization CSV to reach Succeeded"
+# kubevirt-hyperconverged installs into its own openshift-cnv namespace (its
+# own OperatorGroup, not the shared openshift-operators one) — separate wait,
+# same pattern as above.
+for i in $(seq 1 30); do
+  phase=$(oc get csv -n openshift-cnv -o json 2>/dev/null \
+    | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for i in d['items']:
+    if 'kubevirt-hyperconverged' in i['metadata']['name'].lower():
+        print(i.get('status',{}).get('phase',''))
+" 2>/dev/null)
+  [ "$phase" = "Succeeded" ] && { ok "kubevirt-hyperconverged CSV Succeeded"; break; }
+  echo "    ... still installing (phase=$phase)"
+  sleep 15
+done
+oc get csv -n openshift-cnv
+
+step "Activate OpenShift Virtualization (HyperConverged CR)"
+oc apply -f 00-prerequisites/manifests/hyperconverged.yaml
+for i in $(seq 1 30); do
+  available=$(oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv \
+    -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null)
+  [ "$available" = "True" ] && { ok "HyperConverged Available"; break; }
+  echo "    ... waiting for KubeVirt/CDI to come up"
+  sleep 15
+done
+oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv
 
 # ── Step: user-workload monitoring ───────────────────────────────────────────
 step "Enable user-workload monitoring (needed by Kiali's traffic graphs and Chapter 7's ServiceMonitors)"

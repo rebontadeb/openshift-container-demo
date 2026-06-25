@@ -12,6 +12,11 @@ kind: Kustomization
 #     this installs servicemeshoperator3 (Sail Operator-based OSSM 3.x).
 #   - Distributed tracing: Jaeger operator (jaeger-product) is deprecated -
 #     this installs tempo-product (Tempo Operator) instead.
+#
+# OpenShift Virtualization (kubevirt-hyperconverged) is the exception: it
+# installs into its own openshift-cnv namespace with a dedicated
+# OperatorGroup, not the shared openshift-operators one — hence the extra
+# namespace/operatorgroup resources below, applied before its Subscription.
 resources:
   - pipelines-subscription.yaml
   - gitops-subscription.yaml
@@ -19,3 +24,6 @@ resources:
   - tempo-subscription.yaml
   - kiali-subscription.yaml
   - opentelemetry-subscription.yaml
+  - cnv-namespace.yaml
+  - cnv-operatorgroup.yaml
+  - cnv-subscription.yaml

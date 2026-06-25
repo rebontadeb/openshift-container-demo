@@ -1,0 +1,11 @@
+# Activates OpenShift Virtualization (KubeVirt, CDI, etc.) once the
+# kubevirt-hyperconverged CSV has Succeeded. Applied separately from
+# missing-operators/ in prepare-cluster.sh — same pattern as Kiali/Istio's
+# CRs being created only after their operators are ready, not bundled with
+# the Subscription itself.
+apiVersion: hco.kubevirt.io/v1beta1
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+spec: {}
