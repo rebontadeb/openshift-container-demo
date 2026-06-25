@@ -138,8 +138,17 @@ CHAPTER 05 — Service Mesh (OSSM 3 / Sail Operator — requires cluster-admin)
     -- Required here, not just in Chapter 7: Kiali's traffic graphs (Lab 5b
     -- onward) read istio_requests_total from Thanos, which only has data if
     -- something is scraping the Envoy sidecars into user-workload Prometheus --
-    oc patch configmap cluster-monitoring-config -n openshift-monitoring \
-      --type=merge -p '{"data":{"config.yaml":"enableUserWorkload: true\n"}}'
+    -- IMPORTANT: cluster-monitoring-config doesn't exist on a fresh cluster —
+    -- `oc patch --type=merge` 404s against a ConfigMap that isn't there yet.
+    -- Check first, create if missing, patch only if it already exists
+    -- (prepare-cluster.sh already does this; this is the manual equivalent) --
+    if oc get configmap cluster-monitoring-config -n openshift-monitoring >/dev/null 2>&1; then
+      oc patch configmap cluster-monitoring-config -n openshift-monitoring \
+        --type=merge -p '{"data":{"config.yaml":"enableUserWorkload: true\n"}}'
+    else
+      oc create configmap cluster-monitoring-config -n openshift-monitoring \
+        --from-literal=config.yaml="enableUserWorkload: true"
+    fi
 
     >> Wait: oc get pods -n openshift-user-workload-monitoring -w
     >>       (prometheus-user-workload-0/1 and thanos-ruler-user-workload-0 Running)
