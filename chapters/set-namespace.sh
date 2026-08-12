@@ -52,7 +52,8 @@ if [ "$NEW_NS" = "$OLD_NS" ]; then
   exit 0
 fi
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+REPO_ROOT="$(dirname "$(dirname "$SCRIPT_PATH")")"
 cd "$REPO_ROOT"
 
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -60,7 +61,7 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 1
 fi
 
-SELF="$(git ls-files --full-name -- "${BASH_SOURCE[0]}")"
+SELF="$(git ls-files --full-name -- "$SCRIPT_PATH")"
 
 mapfile -t FILES < <(git grep -lI --fixed-strings "$OLD_NS" -- \
   '*.yaml' '*.yml' '*.sh' '*.md' ":!$SELF" 2>/dev/null || true)
