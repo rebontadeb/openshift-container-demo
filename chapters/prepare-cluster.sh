@@ -4,7 +4,7 @@
 # Cluster-admin, one-time setup: operators, user-workload monitoring, and the
 # two OpenShift console plugins (Pipelines/GitOps) that the operators install
 # but don't enable themselves. Run this once per cluster, before
-# deploy-demo.sh.
+# deploy-demo-resume.sh.
 #
 # Usage:
 #   ./prepare-cluster.sh          # pauses before every step
@@ -141,5 +141,5 @@ fi
 
 echo
 echo "════════════════════════════════════════════════════════════════════"
-echo " Cluster preparation complete. Run deploy-demo.sh next."
+echo " Cluster preparation complete. Run deploy-demo-resume.sh next."
 echo "════════════════════════════════════════════════════════════════════"

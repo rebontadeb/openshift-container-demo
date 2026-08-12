@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # FinanceFlow Workshop — Cleanup
 #
-# Reverses deploy-demo.sh: removes the app, mesh, CI/CD, and observability
+# Reverses deploy-demo-resume.sh: removes the app, mesh, CI/CD, and observability
 # resources, plus the namespaces they live in (financeflow-workshop, grafana,
 # istio-system, istio-cni) and the handful of cluster-scoped leftovers
 # (SCC, ClusterRole, ClusterRoleBindings) that namespace deletion alone

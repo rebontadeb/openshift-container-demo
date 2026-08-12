@@ -35,9 +35,15 @@ if [ -z "$NEW_NS" ]; then
 fi
 
 # DNS-1123 label: lowercase alphanumeric or '-', start/end alphanumeric, <=63 chars
-if ! [[ "$NEW_NS" =~ ^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$ ]]; then
+DNS1123='^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$'
+if ! [[ "$NEW_NS" =~ $DNS1123 ]]; then
   echo "Error: '$NEW_NS' is not a valid Kubernetes namespace name" >&2
   echo "(lowercase alphanumeric and '-', must start/end alphanumeric, max 63 chars)" >&2
+  exit 1
+fi
+
+if ! [[ "$OLD_NS" =~ $DNS1123 ]]; then
+  echo "Error: '$OLD_NS' is not a valid Kubernetes namespace name" >&2
   exit 1
 fi
 
