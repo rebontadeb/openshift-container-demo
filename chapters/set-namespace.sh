@@ -54,8 +54,10 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 1
 fi
 
+SELF="$(git ls-files --full-name -- "${BASH_SOURCE[0]}")"
+
 mapfile -t FILES < <(git grep -lI --fixed-strings "$OLD_NS" -- \
-  '*.yaml' '*.yml' '*.sh' '*.md' 2>/dev/null || true)
+  '*.yaml' '*.yml' '*.sh' '*.md' ":!$SELF" 2>/dev/null || true)
 
 if [ "${#FILES[@]}" -eq 0 ]; then
   echo "No files contain '$OLD_NS' — nothing to do."
