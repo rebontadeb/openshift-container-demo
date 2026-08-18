@@ -104,32 +104,11 @@ oc get route default-route -n openshift-image-registry
 
 ## Step 5 — Install Required Operators
 
-Install each operator from **Administrator → OperatorHub**, or apply the ready-made Subscriptions in `chapters/00-prerequisites/manifests/missing-operators/`. Install Service Mesh first — it pulls in Tempo and Kiali as dependencies for Chapter 5's tracing/Kiali integration.
-
-```bash
-# Apply all six Subscriptions in one shot
-oc apply -k chapters/00-prerequisites/manifests/missing-operators/
-
-# Verify what's installed
-oc get csv -A | grep -E "pipelines|gitops|servicemesh3|tempo|kiali|opentelemetry"
-```
-
-| Operator | Required for | OperatorHub / package name |
-|----------|-------------|-----------------|
-| OpenShift Pipelines | Chapter 6 | Red Hat OpenShift Pipelines (`openshift-pipelines-operator-rh`) |
-| OpenShift GitOps | Chapter 6 | Red Hat OpenShift GitOps (`openshift-gitops-operator`) |
-| OpenShift Service Mesh 3 | Chapter 5 | Red Hat OpenShift Service Mesh (`servicemeshoperator3`, Sail Operator) |
-| Tempo | Chapters 5, 7 | Tempo Operator (`tempo-product`) — replaces the deprecated Jaeger operator |
-| Kiali | Chapter 5 | Kiali Operator (Red Hat) (`kiali-ossm`) |
-| OpenTelemetry | Chapter 7 | Red Hat build of OpenTelemetry (`opentelemetry-product`) |
-
-All installs: keep all defaults, install to all namespaces, wait for `Succeeded` CSV status.
-
-```bash
-# Poll until all CSVs are Succeeded (run after each install)
-oc get csv -A --no-headers | grep -v Succeeded
-# Should eventually return nothing
-```
+Run [Prepare-Cluster-For-Admins.md](../../../Prepare-Cluster-For-Admins.md)
+now — it covers operator installs (Pipelines, GitOps, Service Mesh 3, Tempo,
+Kiali, OpenTelemetry, OpenShift Virtualization), user-workload monitoring,
+and the two console plugins in one pass. Come back here for Steps 6–9 once
+it reports complete.
 
 ---
 

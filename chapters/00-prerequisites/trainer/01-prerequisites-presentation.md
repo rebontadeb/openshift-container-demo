@@ -145,12 +145,13 @@ Repository structure:
 app/                      ← FinanceFlow source code (4 services)
 chapters/
   00-prerequisites/       ← this chapter (project template includes LimitRange/ResourceQuota)
-  01-builds/
+  01-builds/               ← manifests per chapter (01-builds .. 07-observability)
   02-deployments/
   ...
   07-observability/
-  slides/                 ← slide deck per chapter
-WORKSHOP.md               ← chapter index and full outline
+content/                  ← merged Concepts + Hands-On Lab guide, one file per chapter
+Deploy-Workshop.md               ← student step-by-step deployment guide
+Prepare-Cluster-For-Admins.md    ← trainer cluster-prep guide
 ```
 
 ---
