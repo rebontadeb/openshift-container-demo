@@ -1,4 +1,6 @@
-# Lab 7 — OpenTelemetry & Observability
+# Chapter 7 — OpenTelemetry & Observability
+
+**FinanceFlow Workshop — OpenShift Container Capabilities**
 
 **Chapter:** 7 | **Duration:** 60 min | **Complexity:** 🔴 Advanced
 
@@ -6,7 +8,7 @@
 
 ## Objectives
 
-By the end of this lab you will:
+By the end of this chapter you will:
 - Enable user-workload monitoring so OpenShift's built-in Prometheus scrapes your namespace
 - Deploy an OTel Collector and route telemetry to Jaeger and Prometheus
 - Instrument FinanceFlow services with the OTel SDK (traces)
@@ -25,7 +27,252 @@ By the end of this lab you will:
 
 ---
 
-## Lab 7a — User-Workload Monitoring (already enabled in Chapter 5)
+## Concepts
+
+### The Three Pillars
+
+```
+           METRICS                LOGS                 TRACES
+        ┌──────────┐          ┌──────────┐          ┌──────────┐
+        │ What is  │          │ What     │          │ Where    │
+        │ happening│          │ happened │          │ did time │
+        │ right    │          │ in       │          │ go?      │
+        │ now?     │          │ detail?  │          │          │
+        └──────────┘          └──────────┘          └──────────┘
+        Prometheus            OpenShift             Tempo
+        Grafana               Logging               (Jaeger-compatible UI)
+                              (EFK stack)
+
+All three are needed — metrics alert you, logs explain why, traces show where.
+```
+
+### OpenTelemetry
+
+A **vendor-neutral, open standard** for instrumentation.
+
+One SDK → many backends:
+
+```
+Your App
+  │
+  │ OTel SDK (traces + metrics)
+  ▼
+OTel Collector ──────────► Tempo  (traces)
+                ──────────► Prometheus (metrics)
+                ──────────► Any OTLP-compatible backend
+```
+
+No vendor lock-in. Swap the trace backend (e.g. Tempo → another OTLP vendor) by changing the collector config — zero app changes. That's exactly how this workshop moved from Jaeger to Tempo when OpenShift Service Mesh 3 dropped Jaeger.
+
+### OTel Components
+
+| Component | What it does | Where it lives |
+|-----------|-------------|---------------|
+| **SDK** | Generates telemetry inside the app | A few setup lines in `app.py` — this workshop uses manual SDK setup, not the Instrumentation-CR auto-injection approach |
+| **Instrumentors** | `FlaskInstrumentor`/`SQLAlchemyInstrumentor` wrap routes and queries automatically once the SDK is set up | Your application code |
+| **Collector** | Receives, processes, and exports telemetry | Kubernetes pod (Deployment) |
+| **OTLP** | Wire protocol — gRPC (port 4317) or HTTP (port 4318) | Between SDK and Collector |
+
+### Instrumenting Flask — Zero Business Logic Change
+
+```python
+# New imports
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
+# Setup (before app = Flask)
+OTEL_ENDPOINT = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+if OTEL_ENDPOINT:
+    provider = TracerProvider(resource=Resource.create({SERVICE_NAME: "account-service"}))
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=OTEL_ENDPOINT)))
+    trace.set_tracer_provider(provider)
+
+# Instrument (after app = Flask)
+if OTEL_ENDPOINT:
+    FlaskInstrumentor().instrument_app(app)
+    SQLAlchemyInstrumentor().instrument()
+```
+
+`FlaskInstrumentor` creates a **span for every HTTP request** automatically.
+`SQLAlchemyInstrumentor` creates a **span for every SQL query** automatically.
+
+### Manual Spans for Business Logic
+
+Auto-instrumentation covers HTTP + SQL. Add manual spans for business events:
+
+```python
+tracer = trace.get_tracer("account-service")
+
+@app.route("/api/accounts/<id>/balance", methods=["PATCH"])
+def update_balance(id):
+    with tracer.start_as_current_span("update-balance") as span:
+        account = Account.query.get(id)
+        span.set_attribute("account.id", id)
+        span.set_attribute("account.type", account.account_type)
+        span.set_attribute("balance.before", float(account.balance))
+
+        # ... update logic ...
+
+        span.set_attribute("balance.after", float(account.balance))
+        span.set_attribute("balance.delta", float(delta))
+    return jsonify(account.to_dict())
+```
+
+Now a transfer trace shows: Portal → Transaction → Account → SQL — with balance values on every hop.
+
+### The OTel Collector
+
+```yaml
+receivers:
+  otlp:              # receive from app SDKs
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+
+processors:
+  batch:             # buffer before export
+    timeout: 5s
+  memory_limiter:    # OOM protection
+    limit_mib: 256
+
+exporters:
+  otlp/tempo:        # forward traces to Tempo
+    endpoint: tempo-financeflow:4317
+    tls: { insecure: true }
+  prometheus:        # re-expose metrics
+    endpoint: 0.0.0.0:8889
+
+service:
+  pipelines:
+    traces:
+      receivers:  [otlp]
+      processors: [memory_limiter, batch]
+      exporters:  [debug, otlp/tempo]
+```
+
+The pipeline is **composable** — swapping the trace backend is a one-line exporter change, no app redeploy.
+
+> The metrics pipeline shown above (`prometheus` exporter on `:8889`) was removed from the actual `otel-collector.yaml` in this workshop — see Lab 7d for why (duplicated ServiceMonitor coverage plus a NetworkPolicy gap).
+
+### Prometheus — Metrics Collection
+
+FinanceFlow already exports Prometheus metrics at `/metrics`.
+A `ServiceMonitor` tells the cluster Prometheus to scrape them:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: account-service
+spec:
+  selector:
+    matchLabels:
+      tier: account-service     # matches the Service label
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+```
+
+OpenShift's user-workload Prometheus auto-discovers ServiceMonitors in the namespace.
+No Prometheus config files to edit — just apply the CRD.
+
+### FinanceFlow Metrics (already in app.py)
+
+```python
+# Counters
+REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["method", "endpoint", "status"]
+)
+TRANSFER_COUNT = Counter(
+    "transfer_requests_total",
+    "Transfer operations",
+    ["status"]
+)
+
+# Histograms (auto-produces _bucket, _sum, _count)
+REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "Request latency",
+    ["endpoint"]
+)
+TRANSFER_AMOUNT = Histogram(
+    "transfer_amount_dollars",
+    "Transfer amounts in USD",
+    buckets=[10, 50, 100, 500, 1000, 5000, 10000]
+)
+
+# Gauge
+ACCOUNT_BALANCE = Gauge(
+    "account_balance_dollars",
+    "Current account balance",
+    ["account_id", "account_type"]
+)
+```
+
+### PrometheusRule — Alerting
+
+```yaml
+groups:
+  - name: financeflow.errors
+    rules:
+      - alert: HighTransferErrorRate
+        expr: |
+          rate(transfer_requests_total{status="error"}[5m])
+          /
+          rate(transfer_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Transfer error rate above 5%"
+```
+
+**`for: 2m`** — alert must stay true for 2 minutes before firing (prevents flapping).
+Alerts appear in the OpenShift **Alerting** UI and can route to PagerDuty, Slack, or email via Alertmanager.
+
+### Distributed Trace — A Transfer Request
+
+```
+portal (nginx)
+  │ HTTP POST /api/transactions/transfer
+  │ Trace-ID: abc123  ← propagated via W3C traceparent header
+  ▼
+transaction-service                [span: POST /api/transactions/transfer, 120ms]
+  │  └─ [span: SELECT account, 8ms]
+  │  └─ [span: update-balance (account-service), 45ms]
+  │          │
+  │          ▼
+  │  account-service               [span: PATCH /api/accounts/.../balance, 40ms]
+  │          └─ [span: UPDATE accounts SET balance, 12ms]
+  │
+  └─ [span: INSERT transactions, 15ms]
+```
+
+One request = one trace = every hop visible in Tempo's Jaeger-compatible UI.
+Click the slow span → see the SQL query, the account ID, the balance delta.
+
+### Kiali + Tempo Integration
+
+From the Kiali service graph:
+
+1. Click any service node → **Traces** tab
+2. See all recent traces passing through that service
+3. Click a trace → opens Tempo's Jaeger-compatible UI with the full span waterfall
+4. Filter by: min duration, HTTP status, service name
+
+For a payment SLA violation — open Kiali, click the slow edge, jump to the trace waterfall — under 60 seconds from alert to root cause.
+
+---
+
+## Hands-On Lab
+
+### Lab 7a — User-Workload Monitoring (already enabled in Chapter 5)
 
 Kiali's traffic graphs need this same Thanos/Prometheus metrics pipeline, so
 user-workload monitoring was already enabled back in Chapter 5 (Lab 5a, Step
@@ -48,13 +295,11 @@ If you're running Chapter 7 standalone (skipped Chapter 5), go back and run
 Lab 5a Step 4 first — the ServiceMonitors applied later in this chapter
 (Lab 7d) depend on the same enablement.
 
----
+### Lab 7b — Install OTel Operator and Deploy Collector
 
-## Lab 7b — Install OTel Operator and Deploy Collector
+#### Step 1 — Install the OpenTelemetry Operator
 
-### Step 1 — Install the OpenTelemetry Operator
-
-**Administrator → OperatorHub → search "OpenTelemetry"**  
+**Administrator → OperatorHub → search "OpenTelemetry"**
 Select **Red Hat build of OpenTelemetry** → Install → keep defaults.
 
 ```bash
@@ -62,7 +307,7 @@ oc get csv -n openshift-operators | grep opentelemetry
 # Red Hat build of OpenTelemetry  ...  Succeeded
 ```
 
-### Step 2 — Deploy Tempo (trace storage and query)
+#### Step 2 — Deploy Tempo (trace storage and query)
 
 The Tempo Operator was installed in Chapter 5. Deploy a `TempoMonolithic` instance — a single-binary Tempo good for demos, with in-memory trace storage (no object storage/S3 needed) and a Jaeger-compatible query UI:
 
@@ -77,7 +322,7 @@ Wait for the `tempo-financeflow` pod to reach `Running`, then confirm the Jaeger
 oc get route tempo-financeflow-jaegerui
 ```
 
-### Step 3 — Deploy the OTel Collector
+#### Step 3 — Deploy the OTel Collector
 
 The Collector's `otlp/tempo` exporter (see `otel-collector.yaml`) sends traces to `tempo-financeflow:4317` — deploy Tempo first so the Collector has somewhere to send them:
 
@@ -95,7 +340,7 @@ Inspect the collector's pipeline configuration:
 oc describe opentelemetrycollector financeflow
 ```
 
-### Step 4 — Verify the collector is reachable
+#### Step 4 — Verify the collector is reachable
 
 ```bash
 # Collector should have a Service created automatically
@@ -106,11 +351,9 @@ oc exec deployment/account-service -- sh -c \
   "timeout 3 bash -c 'echo > /dev/tcp/financeflow-collector/4317' && echo REACHABLE || echo UNREACHABLE"
 ```
 
----
+### Lab 7c — Instrument the Services with OTel SDK
 
-## Lab 7c — Instrument the Services with OTel SDK
-
-### Step 1 — Update requirements.txt for each service
+#### Step 1 — Update requirements.txt for each service
 
 Add these packages to `app/account-service/requirements.txt` and `app/transaction-service/requirements.txt`:
 
@@ -122,7 +365,7 @@ opentelemetry-instrumentation-sqlalchemy>=0.41b0
 opentelemetry-instrumentation-requests>=0.41b0
 ```
 
-### Step 2 — Add OTel instrumentation to app.py
+#### Step 2 — Add OTel instrumentation to app.py
 
 Open `app/account-service/app.py`. Add the following blocks:
 
@@ -168,10 +411,10 @@ if OTEL_ENDPOINT:
     RequestsInstrumentor().instrument()
 ```
 
-The full snippet with explanations is in:  
+The full snippet with explanations is in:
 `chapters/07-observability/manifests/otel-instrumentation-snippet.py`
 
-### Step 3 — Add OTel environment variables to ConfigMaps
+#### Step 3 — Add OTel environment variables to ConfigMaps
 
 Update `chapters/02-deployments/manifests/configmap-account-service.yaml`:
 
@@ -193,7 +436,7 @@ data:
   OTEL_PROPAGATORS: "tracecontext,baggage"
 ```
 
-### Step 4 — Rebuild and redeploy
+#### Step 4 — Rebuild and redeploy
 
 ```bash
 # Rebuild the images with OTel packages
@@ -210,11 +453,9 @@ oc rollout status deployment/account-service
 oc rollout status deployment/transaction-service
 ```
 
----
+### Lab 7d — Prometheus Metrics
 
-## Lab 7d — Prometheus Metrics
-
-### Step 1 — Apply ServiceMonitors
+#### Step 1 — Apply ServiceMonitors
 
 ```bash
 oc apply -f chapters/07-observability/manifests/servicemonitor-account-service.yaml
@@ -231,7 +472,7 @@ oc get servicemonitor
 > live via Kiali: the `financeflow-collector` workload showed `errorRatio:
 > 100, status: "Failure"` because of this exact dead, broken path.
 
-### Step 2 — Verify scraping in the Prometheus UI
+#### Step 2 — Verify scraping in the Prometheus UI
 
 **Administrator → Observe → Metrics**
 
@@ -255,7 +496,7 @@ histogram_quantile(0.99,
 )
 ```
 
-### Step 3 — Generate load to populate metrics
+#### Step 3 — Generate load to populate metrics
 
 ```bash
 # Run 100 requests in the background
@@ -269,18 +510,16 @@ oc exec deployment/portal -- sh -c \
 echo "Load running — check Prometheus in 60 seconds"
 ```
 
----
+### Lab 7e — Alerting with PrometheusRule
 
-## Lab 7e — Alerting with PrometheusRule
-
-### Step 1 — Apply the alerting rules
+#### Step 1 — Apply the alerting rules
 
 ```bash
 oc apply -f chapters/07-observability/manifests/prometheusrule-financeflow.yaml
 oc get prometheusrule
 ```
 
-### Step 2 — View rules in the Alerting UI
+#### Step 2 — View rules in the Alerting UI
 
 **Administrator → Observe → Alerting → Alerting Rules**
 
@@ -295,7 +534,7 @@ Filter by namespace `financeflow-workshop`. You should see:
 
 All should be in `Inactive` state — good, the system is healthy.
 
-### Step 3 — Trigger a test alert
+#### Step 3 — Trigger a test alert
 
 Make `account-service` temporarily unreachable:
 
@@ -317,19 +556,17 @@ oc patch deployment account-service --type=json -p \
 oc rollout status deployment/account-service
 ```
 
----
-
-## Lab 7f — Distributed Tracing with Tempo
+### Lab 7f — Distributed Tracing with Tempo
 
 Tempo has no UI of its own — Lab 7b enabled its Jaeger-compatible query UI (`jaegerui.enabled: true` in `tempo.yaml`), so the workflow below looks identical to a native Jaeger UI.
 
-### Step 1 — Get the Tempo Jaeger UI URL
+#### Step 1 — Get the Tempo Jaeger UI URL
 
 ```bash
 oc get route tempo-financeflow-jaegerui -o jsonpath='{.spec.host}'
 ```
 
-### Step 2 — Generate a trace
+#### Step 2 — Generate a trace
 
 Make a transfer request through the portal:
 
@@ -350,7 +587,7 @@ Substitute real account IDs from:
 curl -sk "$PORTAL_URL/api/accounts" | python3 -m json.tool | grep '"id"'
 ```
 
-### Step 3 — Find the trace in Jaeger
+#### Step 3 — Find the trace in Jaeger
 
 1. Open the Jaeger UI
 2. **Service**: `transaction-service`
@@ -369,16 +606,14 @@ transaction-service: POST /api/transactions/transfer     [120ms]
 
 Every database call, every inter-service HTTP call, with exact timings.
 
-### Step 4 — Identify the slowest span
+#### Step 4 — Identify the slowest span
 
-In Jaeger, click **Sort: Longest First**. The longest span is the bottleneck.  
+In Jaeger, click **Sort: Longest First**. The longest span is the bottleneck.
 Click that span — examine the tags for `db.statement`, `http.url`, and any custom attributes.
 
----
+### Lab 7g — Grafana Dashboard
 
-## Lab 7g — Grafana Dashboard
-
-### Step 0 — Install the Grafana Operator and wire up the datasource
+#### Step 0 — Install the Grafana Operator and wire up the datasource
 
 Full commands are in `chapters/apply-order.txt` (Steps 7b/7c) — summary:
 
@@ -424,7 +659,7 @@ oc apply -f chapters/07-observability/manifests/grafana/route.yaml
 > # expect: {"status":"OK", message: "Successfully queried the Prometheus API"}
 > ```
 
-### Step 1 — Apply the dashboard
+#### Step 1 — Apply the dashboard
 
 ```bash
 oc apply -f chapters/07-observability/manifests/dashboard-financeflow-overview.yaml
@@ -438,13 +673,13 @@ oc apply -f chapters/07-observability/manifests/dashboard-financeflow-overview.y
 > the same mechanism `dashboard-service-mesh.yaml` already uses
 > successfully.
 
-### Step 2 — Access Grafana
+#### Step 2 — Access Grafana
 
 ```bash
 oc get route grafana -n grafana
 ```
 
-### Step 3 — Find the dashboard
+#### Step 3 — Find the dashboard
 
 It appears under **Dashboards → FinanceFlow — Service Dashboard** within a
 few seconds of applying. If it doesn't show up, check the CR status:
@@ -452,7 +687,7 @@ few seconds of applying. If it doesn't show up, check the CR status:
 oc get grafanadashboard financeflow-overview -n grafana -o jsonpath='{.status}'
 ```
 
-### Step 4 — Explore the dashboard
+#### Step 4 — Explore the dashboard
 
 With load running, the dashboard shows:
 - **Request Rate** — requests/second per service
@@ -515,4 +750,4 @@ oc get prometheusrule
 
 *Workshop complete. FinanceFlow is built, secured, meshed, automated, and observable.*
 
-*See [WORKSHOP.md](../../../WORKSHOP.md) for the full chapter index and appendices.*
+*See [WORKSHOP.md](../WORKSHOP.md) for the full chapter index and appendices.*

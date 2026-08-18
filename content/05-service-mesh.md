@@ -1,4 +1,6 @@
-# Lab 5 — Service Mesh
+# Chapter 5 — Service Mesh
+
+**FinanceFlow Workshop — OpenShift Container Capabilities**
 
 **Chapter:** 5 | **Duration:** 60 min | **Complexity:** 🔴 Medium–Advanced
 
@@ -6,7 +8,7 @@
 
 ## Objectives
 
-By the end of this lab you will:
+By the end of this chapter you will:
 - Install OpenShift Service Mesh and join the FinanceFlow namespace
 - Verify automatic sidecar injection
 - Enforce mTLS in STRICT mode across the namespace
@@ -24,9 +26,243 @@ By the end of this lab you will:
 
 ---
 
-## Lab 5a — Install OpenShift Service Mesh
+## Concepts
 
-### Step 1 — Install required operators via OperatorHub
+### The Problem Service Mesh Solves
+
+Without a mesh, every service must handle these itself:
+
+| Concern | Without mesh | With mesh |
+|---------|-------------|-----------|
+| Encryption in transit | Code + cert management | Automatic mTLS |
+| Retries & timeouts | Each service implements | VirtualService policy |
+| Circuit breaking | Code (e.g., Hystrix) | DestinationRule outlier |
+| Traffic splitting (canary) | Custom load balancer config | Weight field in VirtualService |
+| Distributed tracing | Instrumentation in every service | Sidecar adds trace headers |
+| Traffic metrics | Custom Prometheus in every service | Sidecar exports automatically |
+
+**Zero code changes** — the mesh handles all of this at the infrastructure layer.
+
+### The Sidecar Pattern
+
+```
+┌─────────────────────────────────────┐
+│              Pod                     │
+│                                      │
+│  ┌───────────┐    ┌───────────────┐  │
+│  │ Your App  │◄──►│ Envoy Proxy   │  │
+│  │ :8080     │    │ :15001 (out)  │  │
+│  └───────────┘    │ :15006 (in)   │  │
+│                   └───────────────┘  │
+└─────────────────────────────────────┘
+          ▲                ▲
+          │                │ mTLS
+          │                ▼
+┌─────────────────────────────────────┐
+│              Pod                     │
+│  ┌───────────┐    ┌───────────────┐  │
+│  │ Other App │◄──►│ Envoy Proxy   │  │
+│  └───────────┘    └───────────────┘  │
+└─────────────────────────────────────┘
+```
+
+iptables rules redirect ALL traffic through Envoy — the app never knows the proxy is there.
+
+### OpenShift Service Mesh Components
+
+| Component | Role |
+|-----------|------|
+| **Istio** (Sail Operator) | Control plane — policies, certificates, config |
+| **Envoy** | Data plane sidecar — all traffic goes through it |
+| **Kiali** | Topology graph, traffic flow, health |
+| **Tempo** | Distributed tracing — end-to-end request spans (Jaeger-compatible UI) |
+| **Prometheus** | Mesh metrics (auto-collected by sidecars) |
+| **Grafana** | Mesh dashboards |
+
+All installed via **OperatorHub**: `servicemeshoperator3`, Tempo Operator, `kiali-ossm`.
+
+> OpenShift Service Mesh 2 (Maistra, `ServiceMeshControlPlane`/`ServiceMeshMemberRoll`) is end-of-life on this cluster version. OSSM 3 runs on the **Sail Operator** instead.
+
+### Joining the Mesh
+
+Two CRDs from the Sail Operator (`sailoperator.io/v1`) replace the old SMCP:
+
+```yaml
+# 1. Istio — the control plane itself (cluster-admin)
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+  namespace: istio-system
+spec:
+  version: v1.28-latest
+  namespace: istio-system
+  updateStrategy:
+    type: InPlace
+---
+# 2. IstioCNI — node-level CNI plugin
+apiVersion: sailoperator.io/v1
+kind: IstioCNI
+metadata:
+  name: default
+spec:
+  version: v1.28-latest
+  namespace: istio-cni
+```
+
+```yaml
+# 3. Namespaces join the mesh via a label — no ServiceMeshMemberRoll
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: financeflow-workshop
+  labels:
+    istio-injection: enabled
+```
+
+Once the namespace has that label, **every new pod** gets an Envoy sidecar injected automatically.
+
+### mTLS — Automatic Encryption
+
+```
+Before mesh:                    After mesh:
+  Portal ──HTTP──► Account       Portal ──mTLS──► Account
+  (plain text)                   (encrypted + authenticated)
+```
+
+```yaml
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: financeflow-mtls
+  namespace: financeflow-workshop
+spec:
+  mtls:
+    mode: STRICT    # reject any plain-text connection
+```
+
+**PERMISSIVE** (default): accepts both mTLS and plain-text
+**STRICT**: plain-text is rejected — only fully meshed pods can communicate
+
+Start with PERMISSIVE during migration, switch to STRICT when all pods have sidecars.
+
+### DestinationRule — Define Traffic Policy
+
+```yaml
+spec:
+  host: account-service
+
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL      # mTLS using mesh-managed certs
+    outlierDetection:
+      consecutive5xxErrors: 3 # eject after 3 failures
+      interval: 30s
+      baseEjectionTime: 30s
+
+  subsets:                     # named groups of pods (by label)
+    - name: v1-0
+      labels:
+        version: v1.0
+    - name: v1-1
+      labels:
+        version: v1.1
+```
+
+DestinationRule = **how** to talk to a service (policy, subsets).
+VirtualService = **where** to send traffic.
+
+### VirtualService — Traffic Routing
+
+```yaml
+spec:
+  hosts:
+    - account-service
+  http:
+    - route:
+        - destination:
+            host: account-service
+            subset: v1-0
+          weight: 90        # 90% to stable
+        - destination:
+            host: account-service
+            subset: v1-1
+          weight: 10        # 10% to canary
+      timeout: 10s
+      retries:
+        attempts: 3
+        retryOn: "5xx,reset"
+```
+
+Change weights and `oc apply` — traffic shifts in seconds, no deployment needed.
+
+### Canary Deployment Pattern
+
+```
+Phase 1 — Baseline
+  [v1.0] [v1.0]          weight: 100 / 0
+
+Phase 2 — Canary (10%)
+  [v1.0] [v1.0] [v1.1]  weight: 90 / 10
+       ↓ watch Kiali + Tempo for errors
+
+Phase 3 — Shift (50%)
+  [v1.0] [v1.1]          weight: 50 / 50
+       ↓ metrics look good
+
+Phase 4 — Full cutover
+  [v1.1] [v1.1]          weight: 0 / 100
+       ↓ decommission v1.0 deployment
+
+Rollback at any phase: weight 100 / 0
+```
+
+**No new `oc set image` required** — the VirtualService weight is the only change.
+
+### Circuit Breaking
+
+```yaml
+outlierDetection:
+  consecutive5xxErrors: 3    # 3 failures in a row...
+  interval: 30s              # ...within 30s
+  baseEjectionTime: 30s      # ...ejects the pod for 30s
+  maxEjectionPercent: 50     # but never more than 50% of the pool
+```
+
+```
+Normal:   [pod A] [pod B] [pod C]  — all receive traffic
+
+pod B fails 3 times:
+
+Ejected:  [pod A] [pod C]          — B is removed from rotation
+           ↑                       — traffic redistributed automatically
+After 30s: [pod A] [pod B] [pod C] — B is re-admitted; if it fails again, ejected longer
+```
+
+Prevents one bad pod from degrading the entire service — critical for payment flows.
+
+### Kiali — The Mesh Control Tower
+
+**Navigate to:** Kiali URL in the mesh namespace
+`oc get route kiali -n istio-system`
+
+**Graph view shows:**
+- Real-time traffic flow between services
+- Request rate, error rate, latency (RED metrics)
+- mTLS lock icons on each connection
+- Canary weight split visualised as traffic thickness
+
+**Tracing (Tempo, via its Jaeger-compatible UI — Route `tempo-financeflow-jaegerui`):**
+- End-to-end trace: Portal → Account → PostgreSQL
+- See exactly which hop added latency
+
+---
+
+## Hands-On Lab
+
+### Lab 5a — Install OpenShift Service Mesh
+
+#### Step 1 — Install required operators via OperatorHub
 
 OpenShift Service Mesh 3 depends on three operators. Install them in this order from **Administrator → OperatorHub**:
 
@@ -43,7 +279,7 @@ oc get csv -n openshift-operators | grep -E "servicemeshoperator3|tempo|kiali"
 
 All should show `Succeeded`.
 
-### Step 2 — Create the Istio control plane
+#### Step 2 — Create the Istio control plane
 
 OpenShift Service Mesh 3 uses the Sail Operator's `Istio` and `IstioCNI` custom resources (`sailoperator.io/v1`) instead of the old `ServiceMeshControlPlane`:
 
@@ -64,7 +300,7 @@ default   1           1       True     default            v1.28.0   4m
 
 `READY` must show `1` before continuing.
 
-### Step 3 — Add FinanceFlow namespace to the mesh
+#### Step 3 — Add FinanceFlow namespace to the mesh
 
 OSSM 3 enrolls namespaces with a label rather than a `ServiceMeshMemberRoll`:
 
@@ -76,7 +312,7 @@ oc get namespace financeflow-workshop --show-labels | grep istio-injection
 # istio-injection=enabled
 ```
 
-### Step 4 — Enable monitoring so Kiali graphs actually show traffic
+#### Step 4 — Enable monitoring so Kiali graphs actually show traffic
 
 Kiali's traffic graphs (used throughout the rest of this lab) read the
 `istio_requests_total` metric from Thanos. That metric only exists if
@@ -102,11 +338,9 @@ oc adm policy add-role-to-user \
 oc apply -f chapters/05-service-mesh/manifests/podmonitor-istio-sidecar.yaml
 ```
 
----
+### Lab 5b — Sidecar Injection
 
-## Lab 5b — Sidecar Injection
-
-### Step 1 — Restart pods to get sidecars injected
+#### Step 1 — Restart pods to get sidecars injected
 
 Once a namespace has the `istio-injection: enabled` label, existing pods don't automatically get sidecars — only new pods do. Trigger a rollout for each deployment:
 
@@ -120,7 +354,7 @@ oc rollout status deployment/account-service
 oc rollout status deployment/transaction-service
 ```
 
-### Step 2 — Verify sidecar injection
+#### Step 2 — Verify sidecar injection
 
 Each pod should now show `2/2` containers:
 
@@ -145,7 +379,7 @@ oc get pod -l tier=account-service -o jsonpath='{.items[0].spec.containers[*].na
 # account-service  istio-proxy
 ```
 
-### Step 3 — Deploy Kiali and open it
+#### Step 3 — Deploy Kiali and open it
 
 ```bash
 oc apply -f chapters/05-service-mesh/manifests/kiali.yaml
@@ -175,23 +409,21 @@ In Kiali, observe:
 - Lock icons = mTLS in PERMISSIVE mode (mixed)
 - Request rate, error rate, P99 latency per edge
 
----
+### Lab 5c — Enforce mTLS
 
-## Lab 5c — Enforce mTLS
-
-### Step 1 — Apply STRICT mTLS
+#### Step 1 — Apply STRICT mTLS
 
 ```bash
 oc apply -f chapters/05-service-mesh/manifests/peerauthentication-mtls.yaml
 ```
 
-### Step 2 — Verify STRICT mode is active
+#### Step 2 — Verify STRICT mode is active
 
 ```bash
 oc describe peerauthentication financeflow-mtls
 ```
 
-### Step 3 — Confirm plain-text is now rejected
+#### Step 3 — Confirm plain-text is now rejected
 
 Try connecting to account-service **without** the sidecar (simulating a non-meshed client):
 
@@ -213,15 +445,13 @@ oc delete pod mtls-test
 
 Meshed pods (with Envoy sidecars) communicate fine — Envoy handles the TLS handshake transparently.
 
-### Step 4 — Check Kiali
+#### Step 4 — Check Kiali
 
 Back in Kiali → Graph. All edges between FinanceFlow services should now show a **closed padlock** icon indicating STRICT mTLS.
 
----
+### Lab 5d — Canary Deployment
 
-## Lab 5d — Canary Deployment
-
-### Step 1 — Label existing pods as v1.0
+#### Step 1 — Label existing pods as v1.0
 
 The DestinationRule uses `version` labels to route to subsets. Patch the stable deployment:
 
@@ -237,7 +467,7 @@ Verify the pods have the version label:
 oc get pods -l tier=account-service --show-labels
 ```
 
-### Step 2 — Deploy the canary (v1.1)
+#### Step 2 — Deploy the canary (v1.1)
 
 ```bash
 oc apply -f chapters/05-service-mesh/manifests/deployment-account-service-v11.yaml
@@ -250,14 +480,14 @@ You now have:
 
 Both deployments are behind the **same** `account-service` Service (matched by `tier=account-service`).
 
-### Step 3 — Apply DestinationRule and VirtualService
+#### Step 3 — Apply DestinationRule and VirtualService
 
 ```bash
 oc apply -f chapters/05-service-mesh/manifests/destinationrule-account-service.yaml
 oc apply -f chapters/05-service-mesh/manifests/virtualservice-account-service.yaml
 ```
 
-### Step 4 — Generate traffic and watch the split in Kiali
+#### Step 4 — Generate traffic and watch the split in Kiali
 
 ```bash
 # Continuous load — run for 2 minutes
@@ -269,7 +499,7 @@ In Kiali → Graph, click the `account-service` node. In the right panel you sho
 - ~90% of requests going to v1.0 pods
 - ~10% going to the v1.1 pod
 
-### Step 5 — Shift traffic to 50/50
+#### Step 5 — Shift traffic to 50/50
 
 Edit the VirtualService weights live:
 
@@ -281,7 +511,7 @@ oc patch virtualservice account-service --type=json -p \
 
 Generate more traffic and watch Kiali rebalance.
 
-### Step 6 — Full cutover to v1.1
+#### Step 6 — Full cutover to v1.1
 
 ```bash
 oc patch virtualservice account-service --type=json -p \
@@ -289,24 +519,22 @@ oc patch virtualservice account-service --type=json -p \
     {"op":"replace","path":"/spec/http/0/route/1/weight","value":100}]'
 ```
 
-### Step 7 — Rollback (if needed)
+#### Step 7 — Rollback (if needed)
 
 ```bash
 oc apply -f chapters/05-service-mesh/manifests/virtualservice-account-service-stable.yaml
 # All traffic instantly returns to v1.0 — no pod restart required
 ```
 
----
+### Lab 5e — Circuit Breaking
 
-## Lab 5e — Circuit Breaking
-
-### Step 1 — Apply DestinationRule for transaction-service
+#### Step 1 — Apply DestinationRule for transaction-service
 
 ```bash
 oc apply -f chapters/05-service-mesh/manifests/destinationrule-transaction-service.yaml
 ```
 
-### Step 2 — Simulate a failing pod
+#### Step 2 — Simulate a failing pod
 
 Break one transaction-service pod by patching its liveness endpoint (from Chapter 2):
 
@@ -327,11 +555,11 @@ oc patch deployment transaction-service --type=json -p \
   '[{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/httpGet/path","value":"/health/broken"}]'
 ```
 
-### Step 3 — Watch outlier detection in Kiali
+#### Step 3 — Watch outlier detection in Kiali
 
 In Kiali → Graph, click the `transaction-service` node. After 3 consecutive failures within 30s, the outlier detection ejects the unhealthy pod from the load balancer pool. Kiali shows the ejected pod in red.
 
-### Step 4 — Restore
+#### Step 4 — Restore
 
 ```bash
 oc patch deployment transaction-service --type=json -p \
@@ -393,4 +621,4 @@ oc get clusterrolebinding kiali-cluster-monitoring-view
 
 ---
 
-*Next: [Lab 6 — CI/CD Pipelines & GitOps](../../06-cicd/lab/06-cicd.md)*
+*Next: [Chapter 6 — CI/CD Pipelines & GitOps](06-cicd.md)*

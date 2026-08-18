@@ -1,4 +1,6 @@
-# Lab 4 — Security & RBAC
+# Chapter 4 — Security & RBAC
+
+**FinanceFlow Workshop — OpenShift Container Capabilities**
 
 **Chapter:** 4 | **Duration:** 45 min | **Complexity:** 🟡 Medium
 
@@ -6,7 +8,7 @@
 
 ## Objectives
 
-By the end of this lab you will:
+By the end of this chapter you will:
 - Create dedicated Service Accounts for application and CI/CD workloads
 - Understand SCCs and the privileges they grant or deny
 - Create a custom SCC and bind it to a ServiceAccount
@@ -23,9 +25,233 @@ By the end of this lab you will:
 
 ---
 
-## Lab 4a — Service Accounts
+## Concepts
 
-### Step 1 — Examine the current situation
+### Two Types of Identity
+
+```
+┌─────────────────────────────────────────────────────┐
+│                 OpenShift Cluster                    │
+│                                                      │
+│  Humans                   Workloads                  │
+│  ────────                 ────────                   │
+│  Users                    ServiceAccounts            │
+│  Groups                   (one per pod/app)          │
+│                                                      │
+│  Authenticate via:        Authenticate via:          │
+│  LDAP / OAuth / HTPasswd  Mounted JWT token          │
+└─────────────────────────────────────────────────────┘
+```
+
+Every Pod runs as a ServiceAccount — even if you don't specify one, it defaults to `default`.
+
+**Best practice:** Never use the `default` SA. Create a dedicated SA per application.
+
+### Service Accounts
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: financeflow-app
+  namespace: financeflow-workshop
+```
+
+```yaml
+# Reference in Deployment
+spec:
+  template:
+    spec:
+      serviceAccountName: financeflow-app
+      containers: [...]
+```
+
+The SA's JWT token is auto-mounted at:
+```
+/var/run/secrets/kubernetes.io/serviceaccount/token
+```
+
+This token is how the pod authenticates to the Kubernetes API.
+
+### Security Context Constraints (SCCs)
+
+SCCs are OpenShift's answer to **"what is this pod allowed to do?"**
+
+They control:
+- Which UID the container runs as
+- Whether it can run privileged
+- Which Linux capabilities it can use
+- Which volume types it can mount
+- Whether it can access host namespaces
+
+```bash
+oc get scc          # list all SCCs
+oc describe scc restricted
+```
+
+SCCs are evaluated **when a pod is admitted** — not at runtime.
+
+### The SCC Ladder
+
+```
+  restricted          ← default; non-root, no caps, no host access
+       │
+  restricted-v2       ← default SCC in OCP 4.18; seccomp profile enforced
+       │
+  nonroot             ← any non-root UID
+       │
+  nonroot-v2          ← nonroot + seccomp
+       │
+  anyuid              ← any UID including root (use sparingly)
+       │
+  hostmount-anyuid    ← can mount hostPath
+       │
+  privileged          ← full host access — never for apps
+```
+
+**FinanceFlow uses `financeflow-scc`** (MustRunAsNonRoot) — the Python services declare `USER 1001` in their Containerfiles, which falls outside `restricted`'s MustRunAsRange.
+The nginx portal uses `chown 1001:0` + `chmod g+rwx` so it works correctly regardless of which UID OpenShift assigns.
+
+### What `restricted` Blocks
+
+```bash
+# Try to run as root — blocked by SCC
+oc run root-attempt --image=alpine --command -- sh -c "id"
+# Error: pods "root-attempt" is forbidden:
+#   unable to validate against any security context constraint:
+#   [spec.containers[0].securityContext.runAsUser: Invalid value: 0: must be in the ranges: [1000620000, 1000629999]]
+```
+
+The admission controller rejects the pod before it ever schedules.
+
+### Granting SCC to a Service Account
+
+```bash
+# Imperative (quick demo)
+oc adm policy add-scc-to-user financeflow-scc \
+  -z financeflow-app \
+  -n financeflow-workshop
+
+# Declarative (production) — ClusterRole + RoleBinding
+```
+
+```yaml
+# ClusterRole grants "use" permission on the SCC
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: use-financeflow-scc
+rules:
+  - apiGroups: ["security.openshift.io"]
+    resources: ["securitycontextconstraints"]
+    resourceNames: ["financeflow-scc"]
+    verbs: ["use"]
+```
+
+### RBAC Building Blocks
+
+```
+Role / ClusterRole          → defines WHAT is allowed
+     ↓
+RoleBinding / ClusterRoleBinding  → grants it TO someone
+```
+
+| Resource | Scope | Use for |
+|----------|-------|---------|
+| `Role` | Namespace | App-specific permissions |
+| `ClusterRole` | Cluster-wide | Shared permissions, SCC grants |
+| `RoleBinding` | Namespace | Bind a Role or ClusterRole in one namespace |
+| `ClusterRoleBinding` | Cluster-wide | Cluster admins, platform operators |
+
+**Most day-to-day RBAC is Roles + RoleBindings — never ClusterRoleBindings for app teams.**
+
+### FinanceFlow RBAC Design
+
+```
+financeflow-developers (Group)
+         │
+    RoleBinding → financeflow-viewer (Role)
+         │
+         ├── get/list/watch: pods, logs, services, configmaps
+         ├── get/list/watch: deployments, routes, HPA
+         └── ✗ secrets  ← developers never read credentials
+
+
+financeflow-cicd (ServiceAccount)
+         │
+    RoleBinding → financeflow-deployer (Role)
+         │
+         ├── full CRUD: deployments, services, routes
+         └── ✗ secrets  ← CI/CD never touches credentials
+```
+
+Platform admin creates and rotates secrets separately.
+
+### Pod Security Context
+
+Defined in the Deployment — enforced by the SCC:
+
+```yaml
+securityContext:           # pod-level
+  runAsNonRoot: true       # SCC enforces: no container may run as UID 0
+
+containers:
+  - securityContext:       # container-level
+      runAsUser: 1001      # Python services: explicit UID matching Containerfile USER
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+```
+
+> **Portal exception:** the nginx portal omits `runAsUser` and instead uses `chown :0 + chmod g+rwx` in its Containerfile. OpenShift may assign any UID from the namespace range — group-0 write access ensures nginx can create its temp files regardless.
+
+The SCC checks these values at admission — if the SCC doesn't allow the requested `runAsUser`, the pod is rejected.
+
+### Auditing Access
+
+```bash
+# Can the financeflow-app SA get secrets?
+oc auth can-i get secrets \
+  --as system:serviceaccount:financeflow-workshop:financeflow-app
+# no
+
+# Can a developer list pods?
+oc auth can-i list pods \
+  --as-group financeflow-developers \
+  --as system:authenticated
+# yes
+
+# Who can delete deployments in this namespace?
+oc policy who-can delete deployments -n financeflow-workshop
+
+# What can the CI/CD service account do?
+oc auth can-i --list \
+  --as system:serviceaccount:financeflow-workshop:financeflow-cicd
+```
+
+### Secrets Best Practices
+
+| Practice | Why |
+|----------|-----|
+| Create imperatively, never in committed YAML | Prevents credentials in git history |
+| RBAC: exclude secrets from deployer role | CI/CD pipeline can't exfiltrate creds |
+| etcd encryption enabled (OCP default) | Secrets at rest are AES-256 encrypted |
+| For production: External Secrets Operator | Pull from Vault / AWS Secrets Manager dynamically |
+| Rotate regularly | Limit blast radius of a leaked credential |
+
+```bash
+# Verify etcd encryption is on
+oc get apiserver cluster -o jsonpath='{.spec.encryption.type}'
+# aescbc  (or aesgcm on newer clusters)
+```
+
+---
+
+## Hands-On Lab
+
+### Lab 4a — Service Accounts
+
+#### Step 1 — Examine the current situation
 
 By default every pod in OpenShift runs under the `default` service account:
 
@@ -35,7 +261,7 @@ oc get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.serviceAc
 
 All pods show `default`. This means all pods share the same identity — a compromised pod has the same API access as all other pods.
 
-### Step 2 — Create dedicated Service Accounts
+#### Step 2 — Create dedicated Service Accounts
 
 ```bash
 oc apply -f chapters/04-security/manifests/serviceaccount-financeflow.yaml
@@ -43,7 +269,7 @@ oc apply -f chapters/04-security/manifests/serviceaccount-cicd.yaml
 oc get serviceaccounts
 ```
 
-### Step 3 — Patch deployments to use the app Service Account
+#### Step 3 — Patch deployments to use the app Service Account
 
 ```bash
 for deploy in account-service transaction-service portal; do
@@ -74,7 +300,7 @@ oc get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.serviceAc
 
 All non-postgres pods should now show `financeflow-app`.
 
-### Step 4 — What does the default SA token allow?
+#### Step 4 — What does the default SA token allow?
 
 ```bash
 # Check what the financeflow-app SA can currently do (before adding any roles)
@@ -89,11 +315,9 @@ oc auth can-i get secrets \
 
 By default a new ServiceAccount has no permissions. Pods can still run — they just can't call the Kubernetes API.
 
----
+### Lab 4b — Security Context Constraints
 
-## Lab 4b — Security Context Constraints
-
-### Step 1 — List built-in SCCs
+#### Step 1 — List built-in SCCs
 
 ```bash
 oc get scc
@@ -108,7 +332,7 @@ privileged                        true    [*]          RunAsAny    RunAsAny    R
 restricted                        false   <no value>   MustRunAs   MustRunAsRange RunAsAny RunAsAny  <no value> false           ...
 ```
 
-### Step 2 — Inspect the restricted SCC
+#### Step 2 — Inspect the restricted SCC
 
 ```bash
 oc describe scc restricted
@@ -116,7 +340,7 @@ oc describe scc restricted
 
 Notice the `RunAsUser` strategy is `MustRunAsRange` — OpenShift assigns a UID from the namespace's allocated range (e.g., 1000620000–1000629999). Our Containerfile uses UID 1001 which falls outside this range — but `MustRunAsNonRoot` allows any non-root UID.
 
-### Step 3 — Try running a container as root
+#### Step 3 — Try running a container as root
 
 ```bash
 oc run root-test \
@@ -133,7 +357,7 @@ Error from server (Forbidden): pods "root-test" is forbidden:
 
 The SCC admission webhook blocks the pod before it ever schedules.
 
-### Step 4 — Create the custom FinanceFlow SCC
+#### Step 4 — Create the custom FinanceFlow SCC
 
 ```bash
 oc apply -f chapters/04-security/manifests/scc-financeflow.yaml
@@ -142,7 +366,7 @@ oc describe scc financeflow-scc
 
 Compare to `restricted` — our custom SCC explicitly sets `MustRunAsNonRoot` (any non-root UID, not a cluster-assigned range), drops ALL capabilities, and disallows host namespace access.
 
-### Step 5 — Grant the SCC to the app ServiceAccount
+#### Step 5 — Grant the SCC to the app ServiceAccount
 
 ```bash
 # Declarative approach (preferred):
@@ -154,7 +378,7 @@ oc apply -f chapters/04-security/manifests/rolebinding-sa-use-scc.yaml
 #   -z financeflow-app -n financeflow-workshop
 ```
 
-### Step 6 — Verify pods use the correct SCC
+#### Step 6 — Verify pods use the correct SCC
 
 ```bash
 # Check which SCC OpenShift assigned to running pods
@@ -163,11 +387,9 @@ oc get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annot
 
 Pods running as UID 1001 will match `financeflow-scc` (or `restricted` — OpenShift picks the most restrictive that passes). The annotation shows the actual SCC used.
 
----
+### Lab 4c — RBAC
 
-## Lab 4c — RBAC
-
-### Step 1 — Create the viewer and deployer roles
+#### Step 1 — Create the viewer and deployer roles
 
 ```bash
 oc apply -f chapters/04-security/manifests/role-viewer.yaml
@@ -183,7 +405,7 @@ oc describe role financeflow-deployer
 
 Notice that `secrets` is absent from both roles — this is intentional.
 
-### Step 2 — Create role bindings
+#### Step 2 — Create role bindings
 
 ```bash
 oc apply -f chapters/04-security/manifests/rolebinding-viewer.yaml
@@ -191,7 +413,7 @@ oc apply -f chapters/04-security/manifests/rolebinding-deployer.yaml
 oc get rolebindings
 ```
 
-### Step 3 — Test viewer permissions with `oc auth can-i`
+#### Step 3 — Test viewer permissions with `oc auth can-i`
 
 Simulate what a member of the `financeflow-developers` group can do:
 
@@ -225,7 +447,7 @@ oc auth can-i get secrets \
 # no
 ```
 
-### Step 4 — Test deployer permissions
+#### Step 4 — Test deployer permissions
 
 Simulate what the CI/CD service account can do:
 
@@ -252,7 +474,7 @@ oc auth can-i create secrets \
 
 > **Why can't CI/CD touch secrets?** The pipeline deploys code changes — it has no business reading production database passwords. If the CI/CD service account token were compromised, the attacker still couldn't exfiltrate credentials. Platform admins own secret lifecycle.
 
-### Step 5 — List all permissions for the CI/CD SA
+#### Step 5 — List all permissions for the CI/CD SA
 
 ```bash
 oc auth can-i --list \
@@ -262,7 +484,7 @@ oc auth can-i --list \
 
 This shows every (resource, verb) pair the SA can perform. A useful audit checklist.
 
-### Step 6 — Who can delete pods? (policy audit)
+#### Step 6 — Who can delete pods? (policy audit)
 
 ```bash
 oc policy who-can delete pods -n financeflow-workshop
@@ -270,11 +492,9 @@ oc policy who-can delete pods -n financeflow-workshop
 
 This should show cluster-admins and namespace admins — not the `financeflow-developers` group.
 
----
+### Lab 4d — Pod Security Context Audit
 
-## Lab 4d — Pod Security Context Audit
-
-### Step 1 — Verify all pods are running as non-root
+#### Step 1 — Verify all pods are running as non-root
 
 The FinanceFlow deployment manifests declare `runAsNonRoot: true` but do not pin `runAsUser` — the actual UID comes from each image's `USER` directive, subject to the SCC. Check the real running UID with:
 
@@ -294,14 +514,14 @@ portal-*:              uid=1001 gid=0(root) groups=0(root)
 
 > **Why the portal shows `gid=0`:** the portal Containerfile uses `chown 1001:0` + `chmod g+rwx` (group-0 ownership) rather than creating a dedicated group, so the supplemental group is 0 — the always-present group on OpenShift containers. This lets the portal work with any UID OpenShift assigns while still having write access to the nginx temp directories.
 
-### Step 2 — Check QoS class and security annotations
+#### Step 2 — Check QoS class and security annotations
 
 ```bash
 oc get pods -o json | \
   jq -r '.items[] | [.metadata.name, .status.qosClass, (.metadata.annotations["openshift.io/scc"] // "none")] | @tsv'
 ```
 
-### Step 3 — Try to exec into a pod and escalate
+#### Step 3 — Try to exec into a pod and escalate
 
 ```bash
 POD=$(oc get pod -l tier=account-service -o jsonpath='{.items[0].metadata.name}')
@@ -319,7 +539,7 @@ oc exec $POD -- pip install requests 2>&1 | head -3
 # Writing to /root or attempting pip install will fail — non-root user
 ```
 
-### Step 4 — Verify secrets are not world-readable inside the pod
+#### Step 4 — Verify secrets are not world-readable inside the pod
 
 ```bash
 # The mounted secret volume is only readable by the pod's UID
@@ -377,4 +597,4 @@ oc auth can-i get secrets \
 
 ---
 
-*Next: [Lab 5 — Service Mesh](../../05-service-mesh/lab/05-service-mesh.md)*
+*Next: [Chapter 5 — Service Mesh](05-service-mesh.md)*

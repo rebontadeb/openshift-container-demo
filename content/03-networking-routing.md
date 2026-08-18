@@ -1,4 +1,6 @@
-# Lab 3 — Networking & Routing
+# Chapter 3 — Networking & Routing
+
+**FinanceFlow Workshop — OpenShift Container Capabilities**
 
 **Chapter:** 3 | **Duration:** 45 min | **Complexity:** 🟡 Easy–Medium
 
@@ -6,7 +8,7 @@
 
 ## Objectives
 
-By the end of this lab you will:
+By the end of this chapter you will:
 - Understand how ClusterIP Services (created in Chapter 2) give pods stable DNS auto-registration
 - Expose FinanceFlow externally via an OpenShift Route with TLS edge termination
 - Verify in-cluster DNS resolution using `oc exec`
@@ -25,7 +27,29 @@ By the end of this lab you will:
 
 ---
 
-## Background: How OpenShift Networking Works
+## Concepts
+
+### FinanceFlow Network Topology
+
+```
+Internet
+    │  HTTPS
+    ▼
+[HAProxy Router]  ← OpenShift IngressController
+    │  Route: portal.apps.<cluster-domain>
+    ▼
+[portal:8080]     ← ClusterIP Service
+    │
+    ├──────────────────────────┐
+    ▼                          ▼
+[account-service:8080]   [transaction-service:8080]
+    │                          │
+    └──────────┬───────────────┘
+               ▼
+          [postgres:5432]
+```
+
+Everything inside the cluster talks over ClusterIP Services — never pod IPs directly.
 
 ```
 Internet → HAProxy Router (openshift-ingress) → Route → Service → Pod(s)
@@ -36,13 +60,198 @@ Inside cluster:
 
 Key rule: **always talk to Services, never to pod IPs**. Pod IPs change on restart; Service ClusterIPs are stable.
 
+### The Flat Pod Network
+
+Every pod gets its **own routable IP** within the cluster:
+
+```bash
+oc get pods -o wide
+NAME                          IP
+account-service-6b8d4f-xxxx   10.128.1.47
+account-service-6b8d4f-yyyy   10.128.2.31
+postgres-7d9f5c-xxxx          10.128.1.52
+```
+
+**By default, all pods can reach all other pods** — no firewall.
+
+Problems with using pod IPs directly:
+- Pod restarts → new IP
+- Scaling adds/removes pods
+- You can't load balance across replicas
+
+**Services solve all three.**
+
+### Services — What They Do
+
+A Service gives you:
+
+1. **A stable ClusterIP** — never changes, even as pods restart
+2. **DNS registration** — `account-service.financeflow-workshop.svc.cluster.local`
+3. **Load balancing** — kube-proxy distributes across all matching pods
+4. **Health-aware routing** — only sends traffic to `Ready` pods
+
+```yaml
+spec:
+  selector:
+    tier: account-service    # ← matches pod labels
+  ports:
+    - port: 8080
+      targetPort: 8080
+```
+
+The selector glues Service → Pods. Add a pod with the right label → instantly in rotation.
+
+### Service Types
+
+| Type | Reachable from | Use case |
+|------|---------------|----------|
+| `ClusterIP` | Inside cluster only | All internal services |
+| `NodePort` | Node IP + static port (30000–32767) | Quick external access, not production |
+| `LoadBalancer` | Cloud load balancer IP | Cloud environments only |
+| `ExternalName` | Maps to external DNS | Migrate external DBs into the mesh |
+
+**We use `ClusterIP` for everything** — access from outside goes through a Route, not a NodePort.
+
+### In-cluster DNS
+
+OpenShift's CoreDNS auto-registers every Service:
+
+```
+<service-name>.<namespace>.svc.cluster.local
+```
+
+From any pod in the same namespace, the short form works:
+
+```bash
+# These all resolve to the same ClusterIP:
+curl http://account-service:8080/health/ready
+curl http://account-service.financeflow-workshop:8080/health/ready
+curl http://account-service.financeflow-workshop.svc.cluster.local:8080/health/ready
+```
+
+This is how `transaction-service` finds `account-service` — no hardcoded IPs, no service discovery config.
+
+### OpenShift Routes
+
+A `Route` exposes a Service outside the cluster through the HAProxy router:
+
+```yaml
+apiVersion: route.openshift.io/v1
+kind: Route
+spec:
+  to:
+    kind: Service
+    name: portal
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+```
+
+OpenShift auto-assigns a hostname:
+```
+portal-financeflow-workshop.apps.<cluster-domain>
+```
+
+**Route vs Kubernetes Ingress:** Routes are OpenShift-native and more feature-rich. Ingress works too, but Routes are the standard on OCP.
+
+### TLS Termination Modes
+
+```
+                  ┌──────────────────────────────────────────┐
+                  │          HAProxy Router                   │
+                  │                                           │
+  Client ──HTTPS──► edge        TLS ends here, HTTP inside    │
+                  │                                           │
+  Client ──HTTPS──► passthrough TLS goes straight to pod     │
+                  │                                           │
+  Client ──HTTPS──► reencrypt   TLS ends + re-encrypts       │
+                  └──────────────────────────────────────────┘
+```
+
+| Mode | When to use |
+|------|-------------|
+| `edge` | App doesn't handle TLS — most services |
+| `passthrough` | App owns its own cert (mutual TLS, mTLS) |
+| `reencrypt` | Compliance requires end-to-end encryption |
+
+**FinanceFlow uses `edge`** — nginx doesn't need to handle TLS certificates. HAProxy decrypts the HTTPS traffic and forwards plain HTTP to the portal pod on port 8080. The pod never sees TLS.
+
+### NetworkPolicies — Why They Matter
+
+Without NetworkPolicies, **any pod can reach any other pod** in any namespace.
+
+In a financial application this means:
+- A compromised portal pod can directly query postgres
+- A compromised transaction-service can reach the monitoring namespace
+- A rogue workload in another namespace can scrape account data
+
+**Default deny + explicit allow** is the zero-trust posture:
+
+```
+Apply deny-all → apply only the paths you actually need
+```
+
+NetworkPolicies are **additive** — multiple policies on the same pod are OR'd together.
+
+### NetworkPolicy Structure
+
+```yaml
+spec:
+  podSelector:          # which pods this policy protects
+    matchLabels:
+      tier: account-service
+
+  policyTypes:
+    - Ingress           # control inbound traffic
+
+  ingress:
+    - from:
+        - podSelector:  # who can connect
+            matchLabels:
+              tier: portal
+        - podSelector:
+            matchLabels:
+              tier: transaction-service
+      ports:
+        - port: 8080    # on which port
+```
+
+Empty `podSelector: {}` = applies to **all** pods (used for deny-all).
+
+### FinanceFlow Allow Matrix
+
+```
+                postgres  account-svc  transaction-svc  portal
+postgres           —          ✗             ✗             ✗
+account-svc       ✓           —             ✗             ✗
+transaction-svc   ✓           ✓             —             ✗
+portal            ✗           ✓             ✓             —
+router            ✗           ✗             ✗             ✓
+prometheus        ✓           ✓             ✓             ✓  (port 8080 only)
+```
+
+Row = source, Column = destination. Everything else is **denied** by the `deny-all-ingress` policy.
+
+### Web Console: Network Topology
+
+**Developer → Topology** shows:
+- Arrows between services (derived from Service selectors)
+- Click a Route → opens the app URL
+- Network Policy view: **Administrator → Networking → NetworkPolicies**
+
+The policy view shows which policies protect each pod and which sources are allowed.
+
 ---
 
-## Lab 3a — Inspect the Services
+## Hands-On Lab
+
+### Lab 3a — Inspect the Services
 
 All four Services (`postgres`, `account-service`, `transaction-service`, `portal`) were already created in Chapter 2, right alongside their Deployments — that's what let those pods reach `Ready` in the first place. This lab starts by inspecting what's already there, then builds the Route and NetworkPolicies on top.
 
-### Step 1 — Inspect the ClusterIPs
+#### Step 1 — Inspect the ClusterIPs
 
 ```bash
 oc get svc
@@ -59,7 +268,7 @@ transaction-service   ClusterIP   172.30.78.56     <none>        8080/TCP   12m
 
 ClusterIPs are virtual — they only exist in iptables/OVN rules. They don't respond to ping.
 
-### Step 2 — Verify DNS from inside a pod
+#### Step 2 — Verify DNS from inside a pod
 
 ```bash
 # Exec into the portal pod
@@ -83,17 +292,15 @@ exit
 
 > **What's happening:** CoreDNS (at 172.30.0.10) resolves `account-service` to the ClusterIP `172.30.45.12`. kube-proxy then distributes the connection across all `Ready` pods matching `tier: account-service`.
 
----
+### Lab 3b — Create the Route
 
-## Lab 3b — Create the Route
-
-### Step 1 — Apply the Route
+#### Step 1 — Apply the Route
 
 ```bash
 oc apply -f chapters/03-networking/manifests/route-portal.yaml
 ```
 
-### Step 2 — Get the assigned URL
+#### Step 2 — Get the assigned URL
 
 ```bash
 oc get route portal
@@ -104,7 +311,7 @@ NAME     HOST/PORT                                          PATH   SERVICES   PO
 portal   portal-financeflow-workshop.apps.<cluster-domain>        portal     http   edge/Redirect   None
 ```
 
-### Step 3 — Open in a browser
+#### Step 3 — Open in a browser
 
 ```bash
 # Print the full URL
@@ -113,9 +320,7 @@ echo "https://$(oc get route portal -o jsonpath='{.spec.host}')"
 
 Navigate to the URL — you should see the FinanceFlow portal over HTTPS. The browser will show a valid certificate from the cluster's wildcard cert.
 
-> **TLS edge termination:** HAProxy decrypts the HTTPS traffic and forwards plain HTTP to the portal pod on port 8080. The pod never sees TLS.
-
-### Step 4 — Verify the redirect
+#### Step 4 — Verify the redirect
 
 Try the HTTP URL — it should redirect to HTTPS:
 ```bash
@@ -124,15 +329,13 @@ curl -I "http://$(oc get route portal -o jsonpath='{.spec.host}')"
 # Location: https://portal-financeflow-workshop.apps...
 ```
 
----
+### Lab 3c — NetworkPolicies
 
-## Lab 3c — NetworkPolicies
-
-### Understanding the current state
+#### Understanding the current state
 
 Right now, with no NetworkPolicies applied, **any pod can reach any other pod** including pods in other namespaces. This is the OpenShift default.
 
-### Step 1 — Apply the deny-all policy
+#### Step 1 — Apply the deny-all policy
 
 ```bash
 oc apply -f chapters/03-networking/manifests/networkpolicy-deny-all.yaml
@@ -140,7 +343,7 @@ oc apply -f chapters/03-networking/manifests/networkpolicy-deny-all.yaml
 
 This creates a policy that matches all pods (`podSelector: {}`) and specifies `Ingress` with no rules — meaning all inbound traffic is denied.
 
-### Step 2 — Observe the impact
+#### Step 2 — Observe the impact
 
 Wait about 15 seconds for the policy to propagate, then test from the portal pod:
 
@@ -154,7 +357,7 @@ The portal can no longer reach account-service. The FinanceFlow UI will also sho
 
 > **Note:** Only ingress is blocked. The pod itself can still make outbound calls — but the destination pod drops the incoming connection.
 
-### Step 3 — Restore portal access from the router
+#### Step 3 — Restore portal access from the router
 
 ```bash
 oc apply -f chapters/03-networking/manifests/networkpolicy-allow-portal.yaml
@@ -162,7 +365,7 @@ oc apply -f chapters/03-networking/manifests/networkpolicy-allow-portal.yaml
 
 The portal is now reachable from the HAProxy router again — the UI loads. But the data calls still fail (account-service is still blocked).
 
-### Step 4 — Restore account-service access
+#### Step 4 — Restore account-service access
 
 ```bash
 oc apply -f chapters/03-networking/manifests/networkpolicy-allow-account-service.yaml
@@ -175,13 +378,13 @@ oc exec -it deployment/portal -- sh -c \
 # {"status": "ready"}
 ```
 
-### Step 5 — Restore transaction-service access
+#### Step 5 — Restore transaction-service access
 
 ```bash
 oc apply -f chapters/03-networking/manifests/networkpolicy-allow-transaction-service.yaml
 ```
 
-### Step 6 — Restore database access
+#### Step 6 — Restore database access
 
 ```bash
 oc apply -f chapters/03-networking/manifests/networkpolicy-allow-postgres.yaml
@@ -189,7 +392,7 @@ oc apply -f chapters/03-networking/manifests/networkpolicy-allow-postgres.yaml
 
 Verify the full stack is working — accounts and transactions load in the portal.
 
-### Step 7 — Apply monitoring access
+#### Step 7 — Apply monitoring access
 
 ```bash
 oc apply -f chapters/03-networking/manifests/networkpolicy-allow-monitoring.yaml
@@ -197,14 +400,14 @@ oc apply -f chapters/03-networking/manifests/networkpolicy-allow-monitoring.yaml
 
 This allows Prometheus (in `openshift-monitoring`) to scrape `/metrics` from all FinanceFlow pods.
 
-### Step 8 — Or apply everything at once
+#### Step 8 — Or apply everything at once
 
 ```bash
 # Equivalent to all the above steps
 oc apply -k chapters/03-networking/manifests/
 ```
 
-### Step 9 — Verify the final policy set
+#### Step 9 — Verify the final policy set
 
 ```bash
 oc get networkpolicies
@@ -225,9 +428,7 @@ allow-monitoring-scrape       app=financeflow     30s
 oc describe networkpolicy allow-to-account-service
 ```
 
----
-
-## Lab 3d — Verify the Allow Matrix
+### Lab 3d — Verify the Allow Matrix
 
 Confirm only the intended paths work:
 
@@ -254,9 +455,7 @@ oc exec $POD -- sh -c \
 
 > **Financial context:** The portal being blocked from postgres is a critical control. Even if the portal were compromised, the attacker cannot directly query the accounts table — they must go through account-service and transaction-service, which enforce business logic and logging.
 
----
-
-## Lab 3e — Inspect from the Web Console
+### Lab 3e — Inspect from the Web Console
 
 1. Open **Administrator → Networking → NetworkPolicies**
 2. Select `deny-all-ingress` — see which pods it affects
@@ -305,4 +504,4 @@ oc get pods
 
 ---
 
-*Next: [Lab 4 — Security & RBAC](../../04-security/lab/04-security-rbac.md)*
+*Next: [Chapter 4 — Security & RBAC](04-security-rbac.md)*

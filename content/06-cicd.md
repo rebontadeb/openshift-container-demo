@@ -1,4 +1,6 @@
-# Lab 6 — CI/CD: Pipelines & GitOps
+# Chapter 6 — CI/CD: Pipelines & GitOps
+
+**FinanceFlow Workshop — OpenShift Container Capabilities**
 
 **Chapter:** 6 | **Duration:** 60 min | **Complexity:** 🔴 Advanced
 
@@ -6,7 +8,7 @@
 
 ## Objectives
 
-By the end of this lab you will:
+By the end of this chapter you will:
 - Install OpenShift Pipelines (Tekton) and OpenShift GitOps (ArgoCD)
 - Apply custom Tasks and a multi-stage Pipeline for FinanceFlow
 - Trigger a manual PipelineRun and watch it progress in the UI
@@ -28,9 +30,242 @@ By the end of this lab you will:
 
 ---
 
-## Lab 6a — Install Operators
+## Concepts
 
-### Step 1 — Install OpenShift Pipelines
+### CI vs CD — the Division
+
+```
+Developer pushes code
+        │
+        ▼
+  ┌─────────────┐
+  │     CI      │  OpenShift Pipelines (Tekton)
+  │             │  • Clone source
+  │             │  • Run tests
+  │             │  • Build image
+  │             │  • Push to ImageStream
+  │             │  • Update image tag in git
+  └──────┬──────┘
+         │ git commit with new image tag
+         ▼
+  ┌─────────────┐
+  │     CD      │  OpenShift GitOps (ArgoCD)
+  │             │  • Detects git change
+  │             │  • Compares cluster vs git
+  │             │  • Syncs cluster to match git
+  └─────────────┘
+```
+
+**CI produces a verified artifact. CD delivers it.**
+
+### OpenShift Pipelines — Tekton
+
+Built on the Kubernetes-native **Tekton** project. Installed via OperatorHub.
+
+| Resource | Role |
+|----------|------|
+| `Task` | Unit of work — one or more sequential steps (containers) |
+| Cluster resolver | Shared tasks (git-clone, buildah, oc-client) live in `openshift-pipelines` ns, referenced via `resolver: cluster` — ClusterTasks were removed in Pipelines 1.17 |
+| `Pipeline` | Ordered graph of tasks with shared workspaces |
+| `PipelineRun` | One execution of a Pipeline with specific params |
+| `Workspace` | Shared storage between tasks (PVC or emptyDir) |
+| `EventListener` | HTTP server that receives webhooks |
+| `TriggerBinding` | Extracts fields from webhook payload |
+| `TriggerTemplate` | Creates a PipelineRun from trigger data |
+
+### FinanceFlow Pipeline
+
+```
+git push
+    │
+EventListener ← GitHub webhook (HMAC-validated)
+    │
+TriggerBinding — extracts: repo-url, revision (SHA), ref
+    │
+TriggerTemplate — creates PipelineRun
+    │
+    ▼
+Pipeline: financeflow-pipeline
+    │
+    ├── Task: git-clone        (cluster resolver, openshift-pipelines ns)
+    ├── Task: run-tests        (custom — pytest)
+    ├── Task: buildah          (cluster resolver — builds Containerfile)
+    ├── Task: openshift-client (cluster resolver — tags image :stable in ImageStream)
+    └── Task: update-manifest  (custom — commits new tag to git)
+```
+
+Each task runs in its own pod. Workspace PVC is shared across all tasks.
+
+### Task Anatomy
+
+```yaml
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: run-tests
+spec:
+  params:
+    - name: service
+      type: string
+  workspaces:
+    - name: source
+  steps:
+    - name: install-deps
+      image: python:3.11-slim
+      workingDir: $(workspaces.source.path)/app/$(params.service)
+      script: |
+        pip install -r requirements.txt
+
+    - name: run-pytest
+      image: python:3.11-slim
+      workingDir: $(workspaces.source.path)/app/$(params.service)
+      script: |
+        python -m pytest tests/ -v
+```
+
+Each `step` is a container. Steps in a Task run **sequentially**.
+Tasks in a Pipeline run **in parallel by default**, unless `runAfter` is set.
+
+### Workspaces — Sharing Data Between Tasks
+
+```yaml
+# Pipeline declares workspaces
+workspaces:
+  - name: source        # each task gets the same PVC mounted
+
+# Task 1 (git-clone) writes to it
+workspaces:
+  - name: output
+    workspace: source
+
+# Task 2 (run-tests) reads from it
+workspaces:
+  - name: source
+    workspace: source
+
+# Task 3 (buildah) reads Containerfile from it
+workspaces:
+  - name: source
+    workspace: source
+```
+
+The PVC is mounted at `/workspace/source` in each task pod — cloned code is available to every subsequent task.
+
+### Webhook Trigger Flow
+
+```
+GitHub push → POST /hooks/my-webhook
+                      │
+               ┌──────▼──────────────┐
+               │   EventListener     │
+               │   (validates HMAC)  │
+               └──────┬──────────────┘
+                      │
+               ┌──────▼──────────────┐
+               │   TriggerBinding    │
+               │   repo-url = body.repository.clone_url
+               │   revision = body.after (SHA)
+               └──────┬──────────────┘
+                      │
+               ┌──────▼──────────────┐
+               │   TriggerTemplate   │
+               │   → creates         │
+               │     PipelineRun     │
+               └─────────────────────┘
+```
+
+The webhook URL is the Route in front of the EventListener service.
+
+### OpenShift GitOps — ArgoCD
+
+Installed via OperatorHub as **OpenShift GitOps**.
+
+```
+Git repo (manifests/)
+        │
+        │  ArgoCD polls every 3 minutes (or webhook)
+        ▼
+┌─────────────────────────────────┐
+│           ArgoCD                │
+│                                 │
+│  Desired state  ←  git repo     │
+│  Actual state   ←  cluster API  │
+│                                 │
+│  Diff → Sync → Apply            │
+└─────────────────────────────────┘
+        │
+        ▼
+  Cluster updated to match git
+```
+
+**Key principle:** The cluster should never diverge from git. If someone applies a change manually, ArgoCD reverts it (`selfHeal: true`).
+
+### ArgoCD Application
+
+```yaml
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: main
+    path: chapters/02-deployments/manifests   # watches this directory
+
+  destination:
+    namespace: financeflow-workshop
+
+  syncPolicy:
+    automated:
+      prune: true       # delete resources removed from git
+      selfHeal: true    # revert manual cluster changes
+
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # HPA manages this — ignore drift here
+```
+
+### The Full CI/CD Loop
+
+```
+1. Developer: git push → main
+
+2. Tekton CI:
+   clone → test → build → push image → commit image tag to git
+
+3. ArgoCD CD:
+   detects new commit → diffs manifests → syncs Deployment
+
+4. OpenShift:
+   Deployment rollout (RollingUpdate, maxUnavailable:0)
+   → new pods pass readiness → old pods terminated
+
+5. Kiali:
+   traffic graph shows new pods receiving traffic
+
+6. Tempo:
+   new traces tagged with the new image version
+```
+
+Zero manual steps from code push to live cluster.
+
+### Security in the Pipeline
+
+| What | How |
+|------|-----|
+| Pipeline runs as `financeflow-cicd` SA (Chapter 4) | Least-privilege identity |
+| SA cannot read Secrets | Credentials never visible to pipeline |
+| Webhook validated with HMAC secret | Only GitHub can trigger builds |
+| `buildah` needs the `pipelines-scc` SCC | Granted only to `financeflow-cicd`, not app workloads |
+| ArgoCD cannot modify Secrets | AppProject whitelist excludes Secret resource |
+| Image signed with Cosign (production) | Supply chain attestation |
+
+---
+
+## Hands-On Lab
+
+### Lab 6a — Install Operators
+
+#### Step 1 — Install OpenShift Pipelines
 
 **Administrator → OperatorHub → search "OpenShift Pipelines"**
 
@@ -47,7 +282,7 @@ ClusterTasks were removed in OpenShift Pipelines 1.17 — shared Tasks now live 
 oc get tasks -n openshift-pipelines | grep -E "git-clone|buildah|openshift-client"
 ```
 
-### Step 1b — Enable the Pipelines console plugin
+#### Step 1b — Enable the Pipelines console plugin
 
 The operator installs the `pipelines-console-plugin` pod, but doesn't always
 enable it in the cluster's Console config — without this, the Developer
@@ -64,7 +299,7 @@ oc patch console.operator.openshift.io cluster --type=json \
 oc get pods -n openshift-console
 ```
 
-### Step 2 — Install OpenShift GitOps
+#### Step 2 — Install OpenShift GitOps
 
 **Administrator → OperatorHub → search "OpenShift GitOps"**
 
@@ -78,7 +313,7 @@ oc get csv -n openshift-operators | grep gitops
 oc get pods -n openshift-gitops
 ```
 
-### Step 2b — Enable the GitOps console plugin
+#### Step 2b — Enable the GitOps console plugin
 
 Same gap as the Pipelines operator (Step 1b): the operator installs the
 `gitops-plugin` pod but doesn't enable it in the Console config — without
@@ -95,7 +330,7 @@ oc patch console.operator.openshift.io cluster --type=json \
 oc get pods -n openshift-console
 ```
 
-### Step 3 — Get the ArgoCD admin password
+#### Step 3 — Get the ArgoCD admin password
 
 ```bash
 oc extract secret/openshift-gitops-cluster -n openshift-gitops --to=- --keys=admin.password
@@ -119,11 +354,9 @@ Log in to the ArgoCD UI with `admin` and the password above.
 > entirely (it's a superuser), which is the quickest way to confirm it's an
 > RBAC issue and not a broken Application.
 
----
+### Lab 6b — Deploy the Tekton Pipeline
 
-## Lab 6b — Deploy the Tekton Pipeline
-
-### Step 1 — Grant the CI/CD service account build permissions
+#### Step 1 — Grant the CI/CD service account build permissions
 
 The `financeflow-cicd` SA (Chapter 4) needs permission to push images and trigger rollouts:
 
@@ -145,7 +378,7 @@ oc adm policy add-scc-to-user pipelines-scc \
   -n financeflow-workshop
 ```
 
-### Step 1b — Give the pipeline its own git push credentials
+#### Step 1b — Give the pipeline its own git push credentials
 
 `task-update-manifest.yaml`'s `git-commit-push` step runs `git push origin HEAD`
 with no auth of its own — easy to miss, since nothing fails until that exact
@@ -165,7 +398,7 @@ oc annotate secret git-credentials-cicd tekton.dev/git-0=https://github.com
 oc secrets link financeflow-cicd git-credentials-cicd
 ```
 
-### Step 2 — Apply pipeline resources
+#### Step 2 — Apply pipeline resources
 
 ```bash
 # Create the workspace PVC and custom Tasks
@@ -181,7 +414,7 @@ oc get tasks
 oc get pipeline
 ```
 
-### Step 3 — Inspect the pipeline in the UI
+#### Step 3 — Inspect the pipeline in the UI
 
 **Developer → Pipelines → financeflow-pipeline → Graph tab**
 
@@ -190,17 +423,15 @@ You should see the task graph:
 clone → test → build → tag-image → update-manifest
 ```
 
----
+### Lab 6c — Manual PipelineRun
 
-## Lab 6c — Manual PipelineRun
-
-### Step 1 — Edit the PipelineRun YAML
+#### Step 1 — Edit the PipelineRun YAML
 
 `chapters/06-cicd/manifests/pipelinerun-account-service.yaml` already points
 at this run's repo. If you're forking the lab, open it and update `repo-url`
 to your own GitHub org/repo first.
 
-### Step 2 — Trigger the run
+#### Step 2 — Trigger the run
 
 ```bash
 oc create -f chapters/06-cicd/manifests/pipelinerun-account-service.yaml
@@ -208,7 +439,7 @@ oc create -f chapters/06-cicd/manifests/pipelinerun-account-service.yaml
 
 > Note: use `oc create` not `oc apply` — `generateName` means a new object is created each time.
 
-### Step 3 — Watch the run
+#### Step 3 — Watch the run
 
 ```bash
 # Stream logs from the active PipelineRun
@@ -224,22 +455,20 @@ Or watch in the UI: **Developer → Pipelines → financeflow-pipeline → Pipel
 
 Click the run to see task-by-task progress, step logs, and timing.
 
-### Step 4 — Verify the image was built and tagged
+#### Step 4 — Verify the image was built and tagged
 
 ```bash
 oc get imagestreamtag financeflow-account:v1.0
 oc get imagestreamtag financeflow-account:stable
 ```
 
----
+### Lab 6d — Set Up ArgoCD
 
-## Lab 6d — Set Up ArgoCD
-
-### Step 1 — Fork the repository
+#### Step 1 — Fork the repository
 
 ArgoCD needs to pull from a git repository. Fork the workshop repo to your GitHub account and note the HTTPS clone URL.
 
-### Step 2 — Update the ArgoCD YAML files
+#### Step 2 — Update the ArgoCD YAML files
 
 Both ArgoCD files already point at this run's repo
 (`https://github.com/rebontadeb/openshift-container-demo.git`). If you're
@@ -250,7 +479,7 @@ sed -i 's|https://github.com/[^/]*/[^"]*\.git|https://github.com/<your-org>/<you
   chapters/06-cicd/manifests/argocd-app-financeflow.yaml
 ```
 
-### Step 3 — Let ArgoCD manage the namespace
+#### Step 3 — Let ArgoCD manage the namespace
 
 The GitOps operator only creates the RoleBinding that lets ArgoCD's
 application-controller manage resources in `financeflow-workshop` if the
@@ -273,7 +502,7 @@ Without this step, ArgoCD will sync `ConfigMap`/`PersistentVolumeClaim` fine
 `HorizontalPodAutoscaler` sync fails with `is forbidden: ... cannot patch
 resource ... in the namespace financeflow-workshop`.
 
-### Step 4 — Create the ArgoCD AppProject and Application
+#### Step 4 — Create the ArgoCD AppProject and Application
 
 These go into the `openshift-gitops` namespace (ArgoCD's namespace):
 
@@ -285,7 +514,7 @@ oc apply -f chapters/06-cicd/manifests/argocd-app-financeflow.yaml \
   -n openshift-gitops
 ```
 
-### Step 5 — Watch the initial sync
+#### Step 5 — Watch the initial sync
 
 In the ArgoCD UI, the `financeflow` application will appear and begin syncing:
 
@@ -305,7 +534,7 @@ oc patch application financeflow -n openshift-gitops \
   --type=merge -p '{"operation":{"sync":{}}}'
 ```
 
-### Step 6 — Test self-healing
+#### Step 6 — Test self-healing
 
 Manually scale down the account-service:
 ```bash
@@ -320,11 +549,9 @@ oc get pods -l tier=account-service
 # Back to 2 pods — restored by ArgoCD selfHeal
 ```
 
----
+### Lab 6e — GitOps in Action
 
-## Lab 6e — GitOps in Action
-
-### Step 1 — Make a configuration change in git
+#### Step 1 — Make a configuration change in git
 
 Edit a ConfigMap in the manifests directory — for example, add an environment variable annotation:
 
@@ -341,7 +568,7 @@ git commit -m "config: set LOG_LEVEL to INFO for account-service"
 git push origin main
 ```
 
-### Step 2 — Watch ArgoCD detect and apply the change
+#### Step 2 — Watch ArgoCD detect and apply the change
 
 Within 3 minutes (or click **Refresh** in the ArgoCD UI):
 
@@ -355,11 +582,9 @@ oc get configmap account-service-config -o yaml | grep LOG_LEVEL
 
 ArgoCD applied the change without any `oc apply` command from you.
 
----
+### Lab 6f — GitHub Webhook (Full Loop)
 
-## Lab 6f — GitHub Webhook (Full Loop)
-
-### Step 1 — Create the webhook secret
+#### Step 1 — Create the webhook secret
 
 ```bash
 WEBHOOK_SECRET=$(openssl rand -hex 20)
@@ -370,7 +595,7 @@ oc create secret generic github-webhook-secret \
   -n financeflow-workshop
 ```
 
-### Step 2 — Apply the trigger resources
+#### Step 2 — Apply the trigger resources
 
 ```bash
 oc apply -f chapters/06-cicd/manifests/triggerbinding-github.yaml
@@ -384,7 +609,7 @@ WEBHOOK_URL="https://$(oc get route financeflow-webhook \
 echo "Webhook URL: $WEBHOOK_URL"
 ```
 
-### Step 3 — Register the webhook in GitHub
+#### Step 3 — Register the webhook in GitHub
 
 1. Go to your forked repo → **Settings → Webhooks → Add webhook**
 2. **Payload URL**: paste the `$WEBHOOK_URL`
@@ -395,7 +620,7 @@ echo "Webhook URL: $WEBHOOK_URL"
 
 GitHub sends a ping event — the EventListener responds with `200 OK`.
 
-### Step 4 — Push a code change to trigger the pipeline
+#### Step 4 — Push a code change to trigger the pipeline
 
 Make any change to a file in `app/account-service/` and push to main:
 
@@ -407,7 +632,7 @@ git commit -m "feat: account-service v1.1 patch"
 git push origin main
 ```
 
-### Step 5 — Watch the full loop
+#### Step 5 — Watch the full loop
 
 ```bash
 # Watch PipelineRuns appear within seconds of the push
@@ -420,8 +645,8 @@ oc get application financeflow -n openshift-gitops -w
 oc rollout status deployment/account-service
 ```
 
-**Developer → Pipelines → PipelineRuns** shows the full pipeline.  
-**ArgoCD UI → financeflow** shows the sync status.  
+**Developer → Pipelines → PipelineRuns** shows the full pipeline.
+**ArgoCD UI → financeflow** shows the sync status.
 **Developer → Topology** shows the rolling update in progress.
 
 ---
@@ -471,4 +696,4 @@ oc get route financeflow-webhook
 
 ---
 
-*Next: [Lab 7 — OpenTelemetry & Observability](../../07-observability/lab/07-observability.md)*
+*Next: [Chapter 7 — OpenTelemetry & Observability](07-observability.md)*
