@@ -2,13 +2,6 @@
 
 **FinanceFlow Workshop — OpenShift Container Capabilities**
 
-This is the cluster-admin, run-once-per-cluster setup behind
-`chapters/prepare-cluster.sh`, broken into individual steps. Run this
-before any student starts [Deploy-Workshop.md](Deploy-Workshop.md).
-
-> Prefer running the script instead of typing commands by hand?
-> `./chapters/prepare-cluster.sh` does exactly what's below, with pauses
-> between steps.
 
 ---
 
@@ -129,5 +122,4 @@ oc patch console.operator.openshift.io cluster --type=json \
 ---
 
 Cluster preparation is complete. Hand off to students — they continue at
-[Deploy-Workshop.md](Deploy-Workshop.md), Part B, each in their own
-namespace.
+[Deploy-Workshop.md](Deploy-Workshop.md), each in their own namespace.

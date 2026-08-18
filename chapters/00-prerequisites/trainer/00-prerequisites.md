@@ -18,7 +18,7 @@ This guide walks the trainer through everything that must be in place **before s
 | 48 h before | Cluster access verified, operators installed |
 | 24 h before | Student namespaces created, registry exposed, pre-flight passes |
 | 1 h before | Run pre-flight check one final time, share login details |
-| Workshop start | Demo the cluster (use `demo/00-prerequisites-demo.sh`) |
+| Workshop start | Demo the cluster live, talking through `content/01-builds-images.md`'s Concepts section |
 
 ---
 
