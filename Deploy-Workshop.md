@@ -6,9 +6,12 @@
 
 ## Before You Start
 
+- Cluster-admin has already run
+  [Prepare-Cluster-For-Admins.md](Prepare-Cluster-For-Admins.md) on this
+  cluster — operators, console plugins, and user-workload monitoring are in
+  place. If you're not sure, ask your instructor or check with them before
+  continuing.
 - `oc` CLI installed and logged in: `oc whoami`
-- Cluster-admin access (needed for Part A — operator installs, console
-  plugins, monitoring config)
 - Workshop repo cloned locally, and you're running commands from the repo
   root (the paths below assume that)
 - A GitHub fork of this repo, plus a Personal Access Token with `repo`
@@ -25,119 +28,7 @@ All commands below assume `$NAMESPACE` is set. If you skip this, substitute
 
 ---
 
-## Part A — Cluster Preparation (cluster-admin, run once per cluster)
-
-These steps install the operators and cluster-wide settings every later
-chapter depends on. One person (the instructor, or whoever has
-cluster-admin) runs Part A once; students then each get their own namespace
-in Part B.
-
-### A1 — Verify you have cluster-admin
-
-```bash
-oc whoami
-oc auth can-i '*' '*' --all-namespaces
-```
-
-If the second command doesn't print `yes`, stop — the rest of Part A will fail.
-
-### A2 — Install the missing operators
-
-Installs OpenShift Pipelines, GitOps, Service Mesh 3 (Sail Operator), Tempo,
-Kiali, OpenTelemetry, and OpenShift Virtualization in one shot via a
-Kustomize overlay of Subscriptions:
-
-```bash
-oc apply -k chapters/00-prerequisites/manifests/missing-operators/
-```
-
-### A3 — Wait for the six `openshift-operators` CSVs to succeed
-
-```bash
-watch -n15 "oc get csv -n openshift-operators | grep -iE 'pipelines|gitops|servicemesh|tempo|kiali|opentelemetry'"
-```
-
-Wait until every row shows `Succeeded`, then `Ctrl+C`.
-
-### A4 — Wait for OpenShift Virtualization's CSV
-
-`kubevirt-hyperconverged` installs into its own `openshift-cnv` namespace
-with its own OperatorGroup — check it separately:
-
-```bash
-watch -n15 "oc get csv -n openshift-cnv"
-```
-
-Wait for `kubevirt-hyperconverged` to show `Succeeded`.
-
-### A5 — Activate OpenShift Virtualization
-
-The operator is installed, but virtualization itself isn't active until you
-create its `HyperConverged` custom resource:
-
-```bash
-oc apply -f chapters/00-prerequisites/manifests/hyperconverged.yaml
-```
-
-```bash
-watch -n15 "oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv -o jsonpath='{.status.conditions[?(@.type==\"Available\")].status}'"
-```
-
-Wait for `True`.
-
-### A6 — Enable user-workload monitoring
-
-Kiali's traffic graphs (Chapter 5) and the app's own ServiceMonitors
-(Chapter 7) both need OpenShift's user-workload Prometheus, which is off by
-default:
-
-```bash
-oc get configmap cluster-monitoring-config -n openshift-monitoring >/dev/null 2>&1 && \
-  oc patch configmap cluster-monitoring-config -n openshift-monitoring \
-    --type=merge -p '{"data":{"config.yaml":"enableUserWorkload: true\n"}}' || \
-  oc create configmap cluster-monitoring-config -n openshift-monitoring \
-    --from-literal=config.yaml="enableUserWorkload: true"
-```
-
-### A7 — Wait for user-workload monitoring pods
-
-```bash
-watch -n10 "oc get pods -n openshift-user-workload-monitoring"
-```
-
-Wait for `prometheus-user-workload-*` and `thanos-ruler-user-workload-*` to
-show `Running`.
-
-### A8 — Enable the Pipelines console plugin
-
-The Pipelines operator installs its console plugin pod but doesn't switch it
-on — without this, Developer → Pipelines stays empty in the web console even
-though the Pipeline objects exist:
-
-```bash
-oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}'
-# if "pipelines-console-plugin" is missing from the list:
-oc patch console.operator.openshift.io cluster --type=json \
-  -p '[{"op": "add", "path": "/spec/plugins/-", "value": "pipelines-console-plugin"}]'
-```
-
-### A9 — Enable the GitOps console plugin
-
-Same gap, same fix — ArgoCD Applications otherwise show nothing in-console:
-
-```bash
-oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}'
-# if "gitops-plugin" is missing from the list:
-oc patch console.operator.openshift.io cluster --type=json \
-  -p '[{"op": "add", "path": "/spec/plugins/-", "value": "gitops-plugin"}]'
-```
-
-Part A is complete. Every step below runs as a regular user in their own
-namespace.
-
----
-
-## Part B — Workshop Deployment (per student, 51 steps)
+## Workshop Deployment (per student, 51 steps)
 
 Run these from the repo root. Each step corresponds 1:1 to a step in
 `chapters/deploy-demo-resume.sh` — if you need to jump to a specific step by
@@ -358,7 +249,8 @@ oc rollout status deployment/portal --timeout=180s
 
 **Step 20 — Create the Istio control plane (Sail Operator)**
 
-This can take a few minutes — the operator was already installed in Part A,
+This can take a few minutes — the operator was already installed by the
+cluster-admin (Prepare-Cluster-For-Admins.md),
 this step just creates the `Istio`/`IstioCNI` custom resources.
 
 ```bash
@@ -424,8 +316,8 @@ oc apply -f chapters/05-service-mesh/manifests/clusterrolebinding-kiali-monitori
 
 **Step 27 — Confirm user-workload monitoring is enabled**
 
-Already done in Part A (Steps A6–A7) — this is a same-idempotent re-check,
-harmless to re-run:
+Already done by the cluster-admin (Prepare-Cluster-For-Admins.md, Steps
+A6–A7) — this is an idempotent re-check, harmless to re-run:
 
 ```bash
 oc get configmap cluster-monitoring-config -n openshift-monitoring -o jsonpath='{.data.config\.yaml}'
@@ -480,7 +372,8 @@ is 15s) and re-check before assuming Step 28 failed.
 
 **Step 32 — Confirm the Pipelines and GitOps console plugins are enabled**
 
-Already done in Part A (Steps A8–A9) — idempotent re-check:
+Already done by the cluster-admin (Prepare-Cluster-For-Admins.md, Steps
+A8–A9) — idempotent re-check:
 
 ```bash
 oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}'
@@ -602,7 +495,7 @@ using the Route from Step 38 and the secret from Step 34 — see
 
 **Step 42 — Install the Grafana Operator**
 
-Not part of Part A's operator batch — installed here, scoped to its own
+Not part of the cluster-admin operator batch — installed here, scoped to its own
 `grafana` namespace:
 
 ```bash
