@@ -1,0 +1,41 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: account-service-metrics-permissive
+  namespace: financeflow-workshop
+spec:
+  selector:
+    matchLabels:
+      tier: account-service
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    "8080":
+      mode: PERMISSIVE
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: transaction-service-metrics-permissive
+  namespace: financeflow-workshop
+spec:
+  selector:
+    matchLabels:
+      tier: transaction-service
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    "8080":
+      mode: PERMISSIVE
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: portal-ingress-permissive
+  namespace: financeflow-workshop
+spec:
+  selector:
+    matchLabels:
+      tier: portal
+  mtls:
+    mode: PERMISSIVE
