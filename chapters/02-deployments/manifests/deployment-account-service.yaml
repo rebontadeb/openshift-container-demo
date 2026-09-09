@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: account-service
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
     tier: account-service
@@ -39,7 +39,7 @@ spec:
       serviceAccountName: financeflow-app
       containers:
         - name: account-service
-          image: financeflow-account:0e10756f4f13b6c65526eba7f8d23a6135274125
+          image: financeflow-account:v1.0
           imagePullPolicy: Always
           ports:
             - name: http
