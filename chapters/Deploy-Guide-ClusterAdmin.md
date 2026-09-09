@@ -660,4 +660,4 @@ user's own script run will skip re-creating them.
 
 *See [Deploy-Guide-NormalUser.md](Deploy-Guide-NormalUser.md) for the
 student-facing copy-paste guide, and
-[content/](content/) for the full concept-and-lab material behind each step.*
+[content/](../content/) for the full concept-and-lab material behind each step.*

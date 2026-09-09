@@ -150,8 +150,8 @@ chapters/
   ...
   07-observability/
 content/                  ← merged Concepts + Hands-On Lab guide, one file per chapter
-Deploy-Workshop.md               ← student step-by-step deployment guide
-Prepare-Cluster-For-Admins.md    ← trainer cluster-prep guide
+  Deploy-Guide-ClusterAdmin.md  ← trainer cluster-prep + full deploy + RBAC grants
+  Deploy-Guide-NormalUser.md    ← student step-by-step deployment guide
 ```
 
 ---

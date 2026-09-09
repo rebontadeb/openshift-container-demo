@@ -104,7 +104,7 @@ oc get route default-route -n openshift-image-registry
 
 ## Step 5 — Install Required Operators
 
-Run [Prepare-Cluster-For-Admins.md](../../../Prepare-Cluster-For-Admins.md)
+Run [Deploy-Guide-ClusterAdmin.md](../../Deploy-Guide-ClusterAdmin.md) Part A
 now — it covers operator installs (Pipelines, GitOps, Service Mesh 3, Tempo,
 Kiali, OpenTelemetry, OpenShift Virtualization), user-workload monitoring,
 and the two console plugins in one pass. Come back here for Steps 6–9 once

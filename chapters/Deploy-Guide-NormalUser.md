@@ -611,5 +611,5 @@ skips every step before your chosen start point.
 
 *See [Deploy-Guide-ClusterAdmin.md](Deploy-Guide-ClusterAdmin.md) for the
 cluster prep and RBAC grants this guide assumes are already done, and
-[content/](content/) for the full concept-and-lab material behind each of
+[content/](../content/) for the full concept-and-lab material behind each of
 these steps.*
