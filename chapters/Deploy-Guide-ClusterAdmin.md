@@ -22,6 +22,11 @@ Set the namespace once, in every terminal you use for this guide:
 ```bash
 export NAMESPACE=myfinance-demo
 ```
+Create Local Gitea with local Podman
+
+```bash
+podman run -d --name gitea  -p 3000:3000  -p 2222:22  -v gitea-data:/data  docker.io/gitea/gitea:latest
+```
 
 ---
 
