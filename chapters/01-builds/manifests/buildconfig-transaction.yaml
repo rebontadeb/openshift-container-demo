@@ -2,7 +2,7 @@ apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
   name: financeflow-transaction
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
     tier: transaction-service

@@ -2,7 +2,7 @@
 # FinanceFlow Workshop — Cleanup
 #
 # Reverses deploy-demo-resume.sh: removes the app, mesh, CI/CD, and observability
-# resources, plus the namespaces they live in (financeflow-workshop, grafana,
+# resources, plus the namespaces they live in (myfinance-demo, grafana,
 # istio-system, istio-cni) and the handful of cluster-scoped leftovers
 # (SCC, ClusterRole, ClusterRoleBindings) that namespace deletion alone
 # wouldn't catch.
@@ -18,7 +18,7 @@
 #
 set -uo pipefail   # no -e: deleting things that are already gone shouldn't abort the script
 
-NAMESPACE="${NAMESPACE:-financeflow-workshop}"
+NAMESPACE="${NAMESPACE:-myfinance-demo}"
 
 PAUSE=true
 WITH_OPERATORS=false

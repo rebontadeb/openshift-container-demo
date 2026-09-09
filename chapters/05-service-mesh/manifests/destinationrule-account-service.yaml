@@ -2,7 +2,7 @@ apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
   name: account-service
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
 spec:

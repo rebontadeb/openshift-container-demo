@@ -20,7 +20,7 @@ inside this repo.
 Set the namespace once, in every terminal you use for this guide:
 
 ```bash
-export NAMESPACE=financeflow-workshop
+export NAMESPACE=myfinance-demo
 ```
 
 ---

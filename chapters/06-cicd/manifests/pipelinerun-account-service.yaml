@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   generateName: financeflow-account-service-run-    # generateName avoids name conflicts
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
     tekton.dev/pipeline: financeflow-pipeline

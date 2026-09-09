@@ -2,7 +2,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: account-service-hpa
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
     tier: account-service
@@ -12,7 +12,7 @@ spec:
     kind: Deployment
     name: account-service
   minReplicas: 2    # never below 2 — financial service must stay available
-  maxReplicas: 4
+  maxReplicas: 3
   metrics:
     - type: Resource
       resource:

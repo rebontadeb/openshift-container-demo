@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: financeflow-pipeline
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
 spec:
@@ -91,7 +91,7 @@ spec:
           workspace: source
       params:
         - name: IMAGE
-          value: image-registry.openshift-image-registry.svc:5000/financeflow-workshop/$(params.image-name):$(params.image-tag)
+          value: image-registry.openshift-image-registry.svc:5000/myfinance-demo/$(params.image-name):$(params.image-tag)
         - name: DOCKERFILE
           value: ./app/$(params.service)/Containerfile
         - name: CONTEXT
@@ -114,8 +114,8 @@ spec:
       params:
         - name: SCRIPT
           value: |
-            oc tag financeflow-workshop/$(params.image-name):$(params.image-tag) \
-                   financeflow-workshop/$(params.image-name):stable
+            oc tag myfinance-demo/$(params.image-name):$(params.image-tag) \
+                   myfinance-demo/$(params.image-name):stable
             echo "Tagged $(params.image-name):$(params.image-tag) as :stable"
             oc get imagestreamtag $(params.image-name):stable -o jsonpath='{.image.metadata.name}' | head -c 20
 

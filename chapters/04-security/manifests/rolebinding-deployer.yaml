@@ -2,13 +2,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: financeflow-cicd-deploy
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
 subjects:
   - kind: ServiceAccount
     name: financeflow-cicd           # CI/CD pipeline SA from Chapter 6
-    namespace: financeflow-workshop
+    namespace: myfinance-demo
 roleRef:
   kind: Role
   name: financeflow-deployer

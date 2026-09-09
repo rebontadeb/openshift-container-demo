@@ -12,9 +12,9 @@ spec:
   sourceRepos:
     - "https://github.com/rebontadeb/openshift-container-demo.git"
 
-  # Only allow deploying to the financeflow-workshop namespace
+  # Only allow deploying to the myfinance-demo namespace
   destinations:
-    - namespace: financeflow-workshop
+    - namespace: myfinance-demo
       server: https://kubernetes.default.svc    # in-cluster
 
   # RBAC — which cluster resources ArgoCD can manage for this project

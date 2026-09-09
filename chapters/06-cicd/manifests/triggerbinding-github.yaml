@@ -2,7 +2,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerBinding
 metadata:
   name: github-push-binding
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
 spec:

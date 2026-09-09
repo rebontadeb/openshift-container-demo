@@ -21,7 +21,7 @@
 # where every earlier step has already succeeded against this cluster.
 #
 # Env vars (all optional — you'll be prompted for anything missing):
-#   NAMESPACE          (default: financeflow-workshop)
+#   NAMESPACE          (default: myfinance-demo)
 #   POSTGRES_PASSWORD  (generated with openssl if unset)
 #   GITHUB_USERNAME    (needed for Chapter 6 — git push credentials)
 #   GITHUB_PAT         (needed for Chapter 6 — token with repo scope)
@@ -31,7 +31,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-NAMESPACE="${NAMESPACE:-financeflow-workshop}"
+NAMESPACE="${NAMESPACE:-myfinance-demo}"
 
 PAUSE=true
 FROM_ARG=""

@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: update-manifest
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
 spec:
@@ -24,7 +24,7 @@ spec:
       default: "FinanceFlow Pipeline"
     - name: git-user-email
       type: string
-      default: "pipeline@financeflow-workshop"
+      default: "pipeline@myfinance-demo"
     - name: git-branch
       type: string
       default: "main"

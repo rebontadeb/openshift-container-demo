@@ -2,7 +2,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerTemplate
 metadata:
   name: financeflow-trigger-template
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
 spec:
@@ -16,7 +16,7 @@ spec:
       kind: PipelineRun
       metadata:
         generateName: financeflow-account-webhook-
-        namespace: financeflow-workshop
+        namespace: myfinance-demo
         labels:
           app: financeflow
           triggers.tekton.dev/trigger: github-push

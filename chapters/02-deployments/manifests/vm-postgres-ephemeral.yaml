@@ -37,7 +37,7 @@ apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
   name: postgres-vm
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
     tier: database
@@ -190,7 +190,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres-vm
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
     tier: database

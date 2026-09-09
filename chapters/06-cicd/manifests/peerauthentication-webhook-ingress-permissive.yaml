@@ -2,7 +2,7 @@ apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
 metadata:
   name: webhook-ingress-permissive
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
 spec:
   # Same pattern as portal-ingress-permissive (Chapter 5) — the namespace-wide
   # financeflow-mtls policy is STRICT, but the OpenShift router (which

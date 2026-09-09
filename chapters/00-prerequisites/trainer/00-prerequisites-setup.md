@@ -134,7 +134,7 @@ oc patch storageclass gp3 \
 
 ```bash
 chmod +x chapters/00-prerequisites/demo/cluster-preflight-check.sh
-NAMESPACE=financeflow-workshop \
+NAMESPACE=myfinance-demo \
   ./chapters/00-prerequisites/demo/cluster-preflight-check.sh
 ```
 
@@ -197,6 +197,6 @@ Students only need to:
 1. Install `oc` CLI on their laptop (provide the download URL)
 2. Run `oc login` with the credentials you hand them
 3. Run `git clone` on the workshop repo
-4. Set `oc project financeflow-workshop`
+4. Set `oc project myfinance-demo`
 
 Everything else in this guide is invisible to them — they land in a ready-to-use namespace.

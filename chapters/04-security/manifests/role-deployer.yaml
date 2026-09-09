@@ -2,7 +2,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: financeflow-deployer
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
   annotations:

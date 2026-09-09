@@ -2,7 +2,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: financeflow-alerts
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
   labels:
     app: financeflow
     # Required for OpenShift user-workload monitoring to pick up these rules
@@ -92,9 +92,9 @@ spec:
       rules:
         - alert: PodMemoryNearLimit
           expr: |
-            container_memory_working_set_bytes{namespace="financeflow-workshop", container!="istio-proxy"}
+            container_memory_working_set_bytes{namespace="myfinance-demo", container!="istio-proxy"}
             /
-            container_spec_memory_limit_bytes{namespace="financeflow-workshop", container!="istio-proxy"} > 0.85
+            container_spec_memory_limit_bytes{namespace="myfinance-demo", container!="istio-proxy"} > 0.85
           for: 5m
           labels:
             severity: warning

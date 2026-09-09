@@ -42,10 +42,10 @@ oc auth can-i create projects --all-namespaces &>/dev/null && \
 
 # ── 4. Workshop namespace ─────────────────────────────────────────────────────
 hdr "Namespace"
-if oc get project financeflow-workshop &>/dev/null; then
-  ok "Project 'financeflow-workshop' exists"
+if oc get project myfinance-demo &>/dev/null; then
+  ok "Project 'myfinance-demo' exists"
 else
-  warn "Project 'financeflow-workshop' does not exist — create with: oc new-project financeflow-workshop"
+  warn "Project 'myfinance-demo' does not exist — create with: oc new-project myfinance-demo"
 fi
 
 # ── 5. Required operators ─────────────────────────────────────────────────────

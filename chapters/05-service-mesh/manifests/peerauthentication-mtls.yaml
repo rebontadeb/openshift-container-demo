@@ -2,7 +2,7 @@ apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
 metadata:
   name: account-service-metrics-permissive
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
 spec:
   selector:
     matchLabels:
@@ -17,7 +17,7 @@ apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
 metadata:
   name: transaction-service-metrics-permissive
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
 spec:
   selector:
     matchLabels:
@@ -32,7 +32,7 @@ apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
 metadata:
   name: portal-ingress-permissive
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
 spec:
   selector:
     matchLabels:

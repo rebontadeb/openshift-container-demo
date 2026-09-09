@@ -5,7 +5,7 @@
 # this namespace — every sync of Deployments/Services/HPAs (anything beyond
 # ConfigMap/PVC, which happen to be reachable via ArgoCD's own default
 # ClusterRole) fails with "is forbidden: ... cannot patch resource ... in the
-# namespace financeflow-workshop".
+# namespace myfinance-demo".
 #
 # This is intentionally NOT applied as a full Namespace object: kubectl's
 # 3-way merge tracks one last-applied-configuration annotation per object —
@@ -14,11 +14,11 @@
 # label, breaking sidecar injection with no error. Use a label patch instead,
 # which only touches the key it names:
 #
-#   oc label namespace financeflow-workshop argocd.argoproj.io/managed-by=openshift-gitops
+#   oc label namespace myfinance-demo argocd.argoproj.io/managed-by=openshift-gitops
 #
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: financeflow-workshop
+  name: myfinance-demo
   labels:
     argocd.argoproj.io/managed-by: openshift-gitops

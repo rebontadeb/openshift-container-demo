@@ -24,7 +24,7 @@ Chapter-wise, copy-paste commands to run all 51 steps of the workshop as a
 Set the namespace once, in every terminal you use for this guide:
 
 ```bash
-export NAMESPACE=financeflow-workshop
+export NAMESPACE=myfinance-demo
 ```
 
 If cluster-admin created your namespace for you under a different name

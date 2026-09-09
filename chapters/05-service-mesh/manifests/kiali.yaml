@@ -8,7 +8,7 @@ spec:
     strategy: openshift
   deployment:
     accessible_namespaces:
-      - financeflow-workshop
+      - myfinance-demo
     cluster_wide_access: true
   external_services:
     prometheus:

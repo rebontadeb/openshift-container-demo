@@ -194,7 +194,7 @@ The trainer has already prepared the cluster. Students need to:
 2. **Log in** with the credentials on your handout:
    ```bash
    oc login https://api.<cluster-domain>:6443 -u <username> -p <password>
-   oc project financeflow-workshop
+   oc project myfinance-demo
    ```
 3. **Clone the repo**:
    ```bash
@@ -209,7 +209,7 @@ That's it — namespace, quota, registry, and operators are already in place.
 ## Housekeeping
 
 - Labs build on each other — don't skip chapters
-- Every `oc` command in a lab references the `financeflow-workshop` namespace
+- Every `oc` command in a lab references the `myfinance-demo` namespace
 - If you fall behind: each chapter's `manifests/` can be applied as a batch with `oc apply -k`
 - The `demo/` scripts are for the instructor — follow along, don't run them yourself
 - Red blocks = breaking; Yellow blocks = optional but recommended; Green blocks = verify/checkpoint

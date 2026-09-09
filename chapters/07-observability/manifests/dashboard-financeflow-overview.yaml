@@ -43,7 +43,7 @@ spec:
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "rate(http_requests_total{namespace=\"financeflow-workshop\"}[2m])",
+              "expr": "rate(http_requests_total{namespace=\"myfinance-demo\"}[2m])",
               "legendFormat": "{{ job }} - {{ method }} {{ endpoint }}"
             }
           ]
@@ -57,7 +57,7 @@ spec:
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "rate(http_requests_total{namespace=\"financeflow-workshop\", status=~\"5..\"}[2m]) / rate(http_requests_total{namespace=\"financeflow-workshop\"}[2m]) * 100",
+              "expr": "rate(http_requests_total{namespace=\"myfinance-demo\", status=~\"5..\"}[2m]) / rate(http_requests_total{namespace=\"myfinance-demo\"}[2m]) * 100",
               "legendFormat": "{{ job }} error %"
             }
           ]
@@ -71,12 +71,12 @@ spec:
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{namespace=\"financeflow-workshop\"}[5m]))",
+              "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{namespace=\"myfinance-demo\"}[5m]))",
               "legendFormat": "{{ job }} P99"
             },
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{namespace=\"financeflow-workshop\"}[5m]))",
+              "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{namespace=\"myfinance-demo\"}[5m]))",
               "legendFormat": "{{ job }} P50"
             }
           ]
@@ -133,7 +133,7 @@ spec:
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-              "expr": "container_memory_working_set_bytes{namespace=\"financeflow-workshop\", container!=\"istio-proxy\", container!=\"\"}",
+              "expr": "container_memory_working_set_bytes{namespace=\"myfinance-demo\", container!=\"istio-proxy\", container!=\"\"}",
               "legendFormat": "{{ pod }}"
             }
           ]

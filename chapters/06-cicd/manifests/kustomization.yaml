@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Apply Chapter 6 CI resources (in financeflow-workshop namespace):
+# Apply Chapter 6 CI resources (in myfinance-demo namespace):
 #   oc apply -k chapters/06-cicd/manifests/
 #
 # Prereqs:
@@ -15,7 +15,7 @@ kind: Kustomization
 #      update-manifest Task's git push step
 #   6. Label the namespace for ArgoCD (never `oc apply -f` namespace-argocd-managed.yaml
 #      — see its comments for why):
-#      oc label namespace financeflow-workshop argocd.argoproj.io/managed-by=openshift-gitops
+#      oc label namespace myfinance-demo argocd.argoproj.io/managed-by=openshift-gitops
 #
 # ArgoCD resources (argocd-project.yaml, argocd-app-financeflow.yaml) go into
 # the openshift-gitops namespace — apply them separately with cluster-admin.

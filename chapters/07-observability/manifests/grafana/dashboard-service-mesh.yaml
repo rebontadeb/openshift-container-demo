@@ -28,7 +28,7 @@ spec:
           },
           "targets": [
             {
-              "expr": "sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m])) by (destination_workload)",
+              "expr": "sum(rate(istio_requests_total{namespace=\"myfinance-demo\",reporter=\"destination\"}[2m])) by (destination_workload)",
               "legendFormat": "{{destination_workload}}"
             }
           ],
@@ -51,11 +51,11 @@ spec:
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m])) by (le, destination_workload))",
+              "expr": "histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"myfinance-demo\",reporter=\"destination\"}[2m])) by (le, destination_workload))",
               "legendFormat": "p99 {{destination_workload}}"
             },
             {
-              "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m])) by (le, destination_workload))",
+              "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"myfinance-demo\",reporter=\"destination\"}[2m])) by (le, destination_workload))",
               "legendFormat": "p50 {{destination_workload}}"
             }
           ],
@@ -75,7 +75,7 @@ spec:
           "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "targets": [
             {
-              "expr": "sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",destination_workload=\"account-service\",reporter=\"destination\"}[2m]))",
+              "expr": "sum(rate(istio_requests_total{namespace=\"myfinance-demo\",destination_workload=\"account-service\",reporter=\"destination\"}[2m]))",
               "legendFormat": ""
             }
           ],
@@ -95,7 +95,7 @@ spec:
           "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "targets": [
             {
-              "expr": "sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",destination_workload=\"transaction-service\",reporter=\"destination\"}[2m]))",
+              "expr": "sum(rate(istio_requests_total{namespace=\"myfinance-demo\",destination_workload=\"transaction-service\",reporter=\"destination\"}[2m]))",
               "legendFormat": ""
             }
           ],
@@ -115,7 +115,7 @@ spec:
           "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "targets": [
             {
-              "expr": "sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",destination_workload=\"portal\",reporter=\"destination\"}[2m]))",
+              "expr": "sum(rate(istio_requests_total{namespace=\"myfinance-demo\",destination_workload=\"portal\",reporter=\"destination\"}[2m]))",
               "legendFormat": ""
             }
           ],
@@ -137,7 +137,7 @@ spec:
           "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "targets": [
             {
-              "expr": "100 * sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\",response_code=~\"2..\"}[2m])) / sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m]))",
+              "expr": "100 * sum(rate(istio_requests_total{namespace=\"myfinance-demo\",reporter=\"destination\",response_code=~\"2..\"}[2m])) / sum(rate(istio_requests_total{namespace=\"myfinance-demo\",reporter=\"destination\"}[2m]))",
               "legendFormat": ""
             }
           ],
@@ -159,7 +159,7 @@ spec:
           "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "targets": [
             {
-              "expr": "100 * sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\",connection_security_policy=\"mutual_tls\"}[2m])) / sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m]))",
+              "expr": "100 * sum(rate(istio_requests_total{namespace=\"myfinance-demo\",reporter=\"destination\",connection_security_policy=\"mutual_tls\"}[2m])) / sum(rate(istio_requests_total{namespace=\"myfinance-demo\",reporter=\"destination\"}[2m]))",
               "legendFormat": ""
             }
           ],
@@ -181,7 +181,7 @@ spec:
           "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "targets": [
             {
-              "expr": "100 * sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\",response_code!~\"2..\"}[2m])) / sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m]))",
+              "expr": "100 * sum(rate(istio_requests_total{namespace=\"myfinance-demo\",reporter=\"destination\",response_code!~\"2..\"}[2m])) / sum(rate(istio_requests_total{namespace=\"myfinance-demo\",reporter=\"destination\"}[2m]))",
               "legendFormat": ""
             }
           ],
@@ -204,7 +204,7 @@ spec:
           },
           "targets": [
             {
-              "expr": "sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"source\"}[2m])) by (source_workload, destination_workload)",
+              "expr": "sum(rate(istio_requests_total{namespace=\"myfinance-demo\",reporter=\"source\"}[2m])) by (source_workload, destination_workload)",
               "legendFormat": "{{source_workload}} → {{destination_workload}}"
             }
           ],
@@ -227,7 +227,7 @@ spec:
           },
           "targets": [
             {
-              "expr": "sum(rate(istio_requests_total{namespace=\"financeflow-workshop\",reporter=\"destination\"}[2m])) by (response_code)",
+              "expr": "sum(rate(istio_requests_total{namespace=\"myfinance-demo\",reporter=\"destination\"}[2m])) by (response_code)",
               "legendFormat": "HTTP {{response_code}}"
             }
           ],
@@ -250,15 +250,15 @@ spec:
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",destination_workload=\"account-service\",reporter=\"destination\"}[2m])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"myfinance-demo\",destination_workload=\"account-service\",reporter=\"destination\"}[2m])) by (le))",
               "legendFormat": "p99"
             },
             {
-              "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",destination_workload=\"account-service\",reporter=\"destination\"}[2m])) by (le))",
+              "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"myfinance-demo\",destination_workload=\"account-service\",reporter=\"destination\"}[2m])) by (le))",
               "legendFormat": "p95"
             },
             {
-              "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",destination_workload=\"account-service\",reporter=\"destination\"}[2m])) by (le))",
+              "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"myfinance-demo\",destination_workload=\"account-service\",reporter=\"destination\"}[2m])) by (le))",
               "legendFormat": "p50"
             }
           ],
@@ -281,15 +281,15 @@ spec:
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",destination_workload=\"transaction-service\",reporter=\"destination\"}[2m])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"myfinance-demo\",destination_workload=\"transaction-service\",reporter=\"destination\"}[2m])) by (le))",
               "legendFormat": "p99"
             },
             {
-              "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",destination_workload=\"transaction-service\",reporter=\"destination\"}[2m])) by (le))",
+              "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"myfinance-demo\",destination_workload=\"transaction-service\",reporter=\"destination\"}[2m])) by (le))",
               "legendFormat": "p95"
             },
             {
-              "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"financeflow-workshop\",destination_workload=\"transaction-service\",reporter=\"destination\"}[2m])) by (le))",
+              "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{namespace=\"myfinance-demo\",destination_workload=\"transaction-service\",reporter=\"destination\"}[2m])) by (le))",
               "legendFormat": "p50"
             }
           ],
