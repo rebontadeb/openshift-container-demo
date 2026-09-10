@@ -98,7 +98,7 @@ financeflow-account:v1.1    →  sha256:d4e5f6...   (new build)
 - Change the registry → update the ImageStream, not every Deployment
 - An image change on `latest` can **trigger a new Deployment automatically**
 
-An **ImageStream** is an OpenShift abstraction over a container image. Instead of hardcoding `image-registry.openshift-image-registry.svc:5000/financeflow-workshop/financeflow-account:abc123` in every Deployment, you just write `financeflow-account:latest` and OpenShift resolves it.
+An **ImageStream** is an OpenShift abstraction over a container image. Instead of hardcoding `image-registry.openshift-image-registry.svc:5000/myfinance-demo/financeflow-account:abc123` in every Deployment, you just write `financeflow-account:latest` and OpenShift resolves it.
 
 ### Docker Strategy: Containerfile in the Cluster
 

@@ -54,7 +54,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: financeflow-app
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
 ```
 
 ```yaml
@@ -130,7 +130,7 @@ The admission controller rejects the pod before it ever schedules.
 # Imperative (quick demo)
 oc adm policy add-scc-to-user financeflow-scc \
   -z financeflow-app \
-  -n financeflow-workshop
+  -n myfinance-demo
 
 # Declarative (production) — ClusterRole + RoleBinding
 ```
@@ -212,7 +212,7 @@ The SCC checks these values at admission — if the SCC doesn't allow the reques
 ```bash
 # Can the financeflow-app SA get secrets?
 oc auth can-i get secrets \
-  --as system:serviceaccount:financeflow-workshop:financeflow-app
+  --as system:serviceaccount:myfinance-demo:financeflow-app
 # no
 
 # Can a developer list pods?
@@ -222,11 +222,11 @@ oc auth can-i list pods \
 # yes
 
 # Who can delete deployments in this namespace?
-oc policy who-can delete deployments -n financeflow-workshop
+oc policy who-can delete deployments -n myfinance-demo
 
 # What can the CI/CD service account do?
 oc auth can-i --list \
-  --as system:serviceaccount:financeflow-workshop:financeflow-cicd
+  --as system:serviceaccount:myfinance-demo:financeflow-cicd
 ```
 
 ### Secrets Best Practices
@@ -305,11 +305,11 @@ All non-postgres pods should now show `financeflow-app`.
 ```bash
 # Check what the financeflow-app SA can currently do (before adding any roles)
 oc auth can-i list pods \
-  --as system:serviceaccount:financeflow-workshop:financeflow-app
+  --as system:serviceaccount:myfinance-demo:financeflow-app
 # no
 
 oc auth can-i get secrets \
-  --as system:serviceaccount:financeflow-workshop:financeflow-app
+  --as system:serviceaccount:myfinance-demo:financeflow-app
 # no
 ```
 
@@ -375,7 +375,7 @@ oc apply -f chapters/04-security/manifests/rolebinding-sa-use-scc.yaml
 
 # Equivalent imperative command (for reference):
 # oc adm policy add-scc-to-user financeflow-scc \
-#   -z financeflow-app -n financeflow-workshop
+#   -z financeflow-app -n myfinance-demo
 ```
 
 #### Step 6 — Verify pods use the correct SCC
@@ -422,28 +422,28 @@ Simulate what a member of the `financeflow-developers` group can do:
 oc auth can-i get pods \
   --as-group financeflow-developers \
   --as fake-dev-user \
-  -n financeflow-workshop
+  -n myfinance-demo
 # yes
 
 # Allowed — read logs
 oc auth can-i get pods/log \
   --as-group financeflow-developers \
   --as fake-dev-user \
-  -n financeflow-workshop
+  -n myfinance-demo
 # yes
 
 # Blocked — cannot delete deployments
 oc auth can-i delete deployments \
   --as-group financeflow-developers \
   --as fake-dev-user \
-  -n financeflow-workshop
+  -n myfinance-demo
 # no
 
 # Blocked — cannot read secrets
 oc auth can-i get secrets \
   --as-group financeflow-developers \
   --as fake-dev-user \
-  -n financeflow-workshop
+  -n myfinance-demo
 # no
 ```
 
@@ -454,21 +454,21 @@ Simulate what the CI/CD service account can do:
 ```bash
 # Allowed — update deployments
 oc auth can-i update deployments \
-  --as system:serviceaccount:financeflow-workshop:financeflow-cicd
+  --as system:serviceaccount:myfinance-demo:financeflow-cicd
 # yes
 
 # Allowed — create services
 oc auth can-i create services \
-  --as system:serviceaccount:financeflow-workshop:financeflow-cicd
+  --as system:serviceaccount:myfinance-demo:financeflow-cicd
 # yes
 
 # Blocked — cannot read or create secrets
 oc auth can-i get secrets \
-  --as system:serviceaccount:financeflow-workshop:financeflow-cicd
+  --as system:serviceaccount:myfinance-demo:financeflow-cicd
 # no
 
 oc auth can-i create secrets \
-  --as system:serviceaccount:financeflow-workshop:financeflow-cicd
+  --as system:serviceaccount:myfinance-demo:financeflow-cicd
 # no
 ```
 
@@ -478,8 +478,8 @@ oc auth can-i create secrets \
 
 ```bash
 oc auth can-i --list \
-  --as system:serviceaccount:financeflow-workshop:financeflow-cicd \
-  -n financeflow-workshop
+  --as system:serviceaccount:myfinance-demo:financeflow-cicd \
+  -n myfinance-demo
 ```
 
 This shows every (resource, verb) pair the SA can perform. A useful audit checklist.
@@ -487,7 +487,7 @@ This shows every (resource, verb) pair the SA can perform. A useful audit checkl
 #### Step 6 — Who can delete pods? (policy audit)
 
 ```bash
-oc policy who-can delete pods -n financeflow-workshop
+oc policy who-can delete pods -n myfinance-demo
 ```
 
 This should show cluster-admins and namespace admins — not the `financeflow-developers` group.
@@ -566,10 +566,10 @@ oc get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.serviceAc
 
 # No workload can read secrets
 oc auth can-i get secrets \
-  --as system:serviceaccount:financeflow-workshop:financeflow-app
+  --as system:serviceaccount:myfinance-demo:financeflow-app
 # no
 oc auth can-i get secrets \
-  --as system:serviceaccount:financeflow-workshop:financeflow-cicd
+  --as system:serviceaccount:myfinance-demo:financeflow-cicd
 # no
 ```
 

@@ -480,7 +480,7 @@ Run these queries in the Prometheus expression browser:
 
 ```promql
 # Request rate per service
-rate(http_requests_total{namespace="financeflow-workshop"}[2m])
+rate(http_requests_total{namespace="myfinance-demo"}[2m])
 
 # Current account balances
 account_balance_dollars
@@ -492,7 +492,7 @@ rate(transfer_requests_total[5m])
 
 # P99 request latency
 histogram_quantile(0.99,
-  rate(http_request_duration_seconds_bucket{namespace="financeflow-workshop"}[5m])
+  rate(http_request_duration_seconds_bucket{namespace="myfinance-demo"}[5m])
 )
 ```
 
@@ -523,7 +523,7 @@ oc get prometheusrule
 
 **Administrator → Observe → Alerting → Alerting Rules**
 
-Filter by namespace `financeflow-workshop`. You should see:
+Filter by namespace `myfinance-demo`. You should see:
 - `AccountServiceDown`
 - `TransactionServiceDown`
 - `HighTransferErrorRate`
@@ -720,7 +720,7 @@ oc get servicemonitor
 oc get prometheusrule
 
 # Metrics visible (run in Prometheus UI)
-# rate(http_requests_total{namespace="financeflow-workshop"}[2m])
+# rate(http_requests_total{namespace="myfinance-demo"}[2m])
 ```
 
 ---
@@ -730,7 +730,7 @@ oc get prometheusrule
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
 | No metrics in Prometheus | User-workload monitoring not enabled | Apply the cluster-monitoring-config patch |
-| ServiceMonitor exists but no data | SA lacks view permission on namespace | `oc adm policy add-role-to-user view <prometheus-sa> -n financeflow-workshop` |
+| ServiceMonitor exists but no data | SA lacks view permission on namespace | `oc adm policy add-role-to-user view <prometheus-sa> -n myfinance-demo` |
 | OTel Collector pod CrashLoopBackOff | Tempo endpoint unreachable | Check Tempo pod: `oc get pods -l app.kubernetes.io/managed-by=tempo-operator` |
 | No traces in Tempo/Jaeger UI | OTEL_EXPORTER_OTLP_ENDPOINT not set or wrong, or Tempo not deployed yet | Verify ConfigMap: `oc get configmap account-service-config -o yaml`; verify `oc get tempomonolithic financeflow` |
 | PrometheusRule not firing | Missing `openshift.io/prometheus-rule-evaluation-scope` label | Add the label and re-apply |

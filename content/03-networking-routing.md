@@ -86,7 +86,7 @@ Problems with using pod IPs directly:
 A Service gives you:
 
 1. **A stable ClusterIP** — never changes, even as pods restart
-2. **DNS registration** — `account-service.financeflow-workshop.svc.cluster.local`
+2. **DNS registration** — `account-service.myfinance-demo.svc.cluster.local`
 3. **Load balancing** — kube-proxy distributes across all matching pods
 4. **Health-aware routing** — only sends traffic to `Ready` pods
 
@@ -125,8 +125,8 @@ From any pod in the same namespace, the short form works:
 ```bash
 # These all resolve to the same ClusterIP:
 curl http://account-service:8080/health/ready
-curl http://account-service.financeflow-workshop:8080/health/ready
-curl http://account-service.financeflow-workshop.svc.cluster.local:8080/health/ready
+curl http://account-service.myfinance-demo:8080/health/ready
+curl http://account-service.myfinance-demo.svc.cluster.local:8080/health/ready
 ```
 
 This is how `transaction-service` finds `account-service` — no hardcoded IPs, no service discovery config.
@@ -151,7 +151,7 @@ spec:
 
 OpenShift auto-assigns a hostname:
 ```
-portal-financeflow-workshop.apps.<cluster-domain>
+portal-myfinance-demo.apps.<cluster-domain>
 ```
 
 **Route vs Kubernetes Ingress:** Routes are OpenShift-native and more feature-rich. Ingress works too, but Routes are the standard on OCP.
@@ -279,7 +279,7 @@ wget -qO- http://account-service:8080/health/ready
 # {"status": "ready"}
 
 # Fully qualified name also works:
-wget -qO- http://account-service.financeflow-workshop.svc.cluster.local:8080/health/ready
+wget -qO- http://account-service.myfinance-demo.svc.cluster.local:8080/health/ready
 # {"status": "ready"}
 
 # DNS lookup
@@ -308,7 +308,7 @@ oc get route portal
 
 ```
 NAME     HOST/PORT                                          PATH   SERVICES   PORT   TERMINATION     WILDCARD
-portal   portal-financeflow-workshop.apps.<cluster-domain>        portal     http   edge/Redirect   None
+portal   portal-myfinance-demo.apps.<cluster-domain>        portal     http   edge/Redirect   None
 ```
 
 #### Step 3 — Open in a browser
@@ -326,7 +326,7 @@ Try the HTTP URL — it should redirect to HTTPS:
 ```bash
 curl -I "http://$(oc get route portal -o jsonpath='{.spec.host}')"
 # HTTP/1.0 301 Moved Permanently
-# Location: https://portal-financeflow-workshop.apps...
+# Location: https://portal-myfinance-demo.apps...
 ```
 
 ### Lab 3c — NetworkPolicies

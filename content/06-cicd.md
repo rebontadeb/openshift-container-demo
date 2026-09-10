@@ -210,7 +210,7 @@ spec:
     path: chapters/02-deployments/manifests   # watches this directory
 
   destination:
-    namespace: financeflow-workshop
+    namespace: myfinance-demo
 
   syncPolicy:
     automated:
@@ -364,7 +364,7 @@ The `financeflow-cicd` SA (Chapter 4) needs permission to push images and trigge
 # Allow the SA to push to the internal registry (ImageStream write)
 oc adm policy add-role-to-user \
   registry-editor \
-  system:serviceaccount:financeflow-workshop:financeflow-cicd
+  system:serviceaccount:myfinance-demo:financeflow-cicd
 
 # Allow buildah to run — pipelines-scc (not privileged!) is purpose-built by
 # the Tekton operator for this: RunAsAny on UID (catalog Tasks like git-clone
@@ -375,7 +375,7 @@ oc adm policy add-role-to-user \
 # namespace is ever deleted/recreated with a different allocated range.
 oc adm policy add-scc-to-user pipelines-scc \
   -z financeflow-cicd \
-  -n financeflow-workshop
+  -n myfinance-demo
 ```
 
 #### Step 1b — Give the pipeline its own git push credentials
@@ -482,11 +482,11 @@ sed -i 's|https://github.com/[^/]*/[^"]*\.git|https://github.com/<your-org>/<you
 #### Step 3 — Let ArgoCD manage the namespace
 
 The GitOps operator only creates the RoleBinding that lets ArgoCD's
-application-controller manage resources in `financeflow-workshop` if the
+application-controller manage resources in `myfinance-demo` if the
 namespace carries this label:
 
 ```bash
-oc label namespace financeflow-workshop argocd.argoproj.io/managed-by=openshift-gitops
+oc label namespace myfinance-demo argocd.argoproj.io/managed-by=openshift-gitops
 ```
 
 > **Do not** `oc apply -f chapters/06-cicd/manifests/namespace-argocd-managed.yaml`
@@ -500,7 +500,7 @@ oc label namespace financeflow-workshop argocd.argoproj.io/managed-by=openshift-
 Without this step, ArgoCD will sync `ConfigMap`/`PersistentVolumeClaim` fine
 (reachable via its own default ClusterRole) but every `Deployment`/`Service`/
 `HorizontalPodAutoscaler` sync fails with `is forbidden: ... cannot patch
-resource ... in the namespace financeflow-workshop`.
+resource ... in the namespace myfinance-demo`.
 
 #### Step 4 — Create the ArgoCD AppProject and Application
 
@@ -592,7 +592,7 @@ echo "Save this: $WEBHOOK_SECRET"
 
 oc create secret generic github-webhook-secret \
   --from-literal=secret=$WEBHOOK_SECRET \
-  -n financeflow-workshop
+  -n myfinance-demo
 ```
 
 #### Step 2 — Apply the trigger resources
@@ -681,7 +681,7 @@ oc get route financeflow-webhook
 | `git-clone`/`update-manifest` fails: `Permission denied` writing to the shared workspace | SA's SCC has `fsGroup: RunAsAny` (e.g. `privileged`) — nothing assigns a writable group to the PVC, so whichever Task's hardcoded UID touches it first "owns" it | Use `pipelines-scc` (`fsGroup: MustRunAs`) instead of `privileged`; don't hardcode an `fsGroup` value in `podTemplate.securityContext` — it won't survive the namespace being recreated |
 | ArgoCD shows `Unknown` sync | Repo URL mismatch or network issue | Check `argocd-project.yaml` sourceRepos field |
 | Webhook returns `400` | HMAC mismatch | Secret in GitHub and `github-webhook-secret` must match |
-| EventListener pod crashes | SA missing Tekton trigger permissions | `oc get events -n financeflow-workshop` |
+| EventListener pod crashes | SA missing Tekton trigger permissions | `oc get events -n myfinance-demo` |
 
 ---
 

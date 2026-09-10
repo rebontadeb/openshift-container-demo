@@ -115,7 +115,7 @@ spec:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: financeflow-workshop
+  name: myfinance-demo
   labels:
     istio-injection: enabled
 ```
@@ -135,7 +135,7 @@ apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
 metadata:
   name: financeflow-mtls
-  namespace: financeflow-workshop
+  namespace: myfinance-demo
 spec:
   mtls:
     mode: STRICT    # reject any plain-text connection
@@ -308,7 +308,7 @@ OSSM 3 enrolls namespaces with a label rather than a `ServiceMeshMemberRoll`:
 oc apply -f chapters/05-service-mesh/manifests/smmr.yaml
 
 # Verify the namespace was labeled
-oc get namespace financeflow-workshop --show-labels | grep istio-injection
+oc get namespace myfinance-demo --show-labels | grep istio-injection
 # istio-injection=enabled
 ```
 
@@ -332,7 +332,7 @@ oc get pods -n openshift-user-workload-monitoring -w
 oc adm policy add-role-to-user \
   view \
   system:serviceaccount:openshift-user-workload-monitoring:prometheus-user-workload \
-  -n financeflow-workshop
+  -n myfinance-demo
 
 # Apply the PodMonitor that scrapes each Envoy sidecar's /stats/prometheus
 oc apply -f chapters/05-service-mesh/manifests/podmonitor-istio-sidecar.yaml
@@ -395,7 +395,7 @@ oc rollout restart deployment/kiali -n istio-system
 echo "Kiali: https://$(oc get route kiali -n istio-system -o jsonpath='{.spec.host}')"
 ```
 
-Open the URL in your browser. Navigate to **Graph → Namespace: financeflow-workshop**. You should see the four service tiers connected with traffic arrows.
+Open the URL in your browser. Navigate to **Graph → Namespace: myfinance-demo**. You should see the four service tiers connected with traffic arrows.
 
 Generate some traffic to populate the graph:
 
@@ -576,7 +576,7 @@ oc get istio -n istio-system
 oc get istiocni -n istio-cni
 
 # Namespace in mesh
-oc get namespace financeflow-workshop --show-labels | grep istio-injection
+oc get namespace myfinance-demo --show-labels | grep istio-injection
 
 # All pods have sidecars (2/2)
 oc get pods
@@ -603,7 +603,7 @@ oc get clusterrolebinding kiali-cluster-monitoring-view
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
-| Pods stuck at `1/2` containers | Namespace missing `istio-injection: enabled` label | `oc get namespace financeflow-workshop --show-labels` — reapply `smmr.yaml` |
+| Pods stuck at `1/2` containers | Namespace missing `istio-injection: enabled` label | `oc get namespace myfinance-demo --show-labels` — reapply `smmr.yaml` |
 | Kiali shows no graph | No traffic generated or wrong namespace selected | Run load loop; check namespace selector in Kiali |
 | `upstream connect error` after mTLS STRICT | A pod doesn't have a sidecar | Ensure all pods show `2/2`; restart any `1/1` pods |
 | VirtualService not splitting traffic | DestinationRule subsets don't match pod labels | `oc get pods --show-labels` — confirm `version=v1.0/v1.1` |
