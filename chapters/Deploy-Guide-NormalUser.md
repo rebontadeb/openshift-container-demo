@@ -537,12 +537,21 @@ oc apply -f 07-observability/manifests/grafana/route.yaml
 oc apply -f 07-observability/manifests/grafana/dashboard-service-mesh.yaml
 ```
 
-**Step 48 — Apply ServiceMonitors and the PrometheusRule**
+**Step 48 — Apply ServiceMonitors, PrometheusRules, and alert routing**
+
+`alertmanagerconfig-financeflow.yaml` has a placeholder webhook URL
+(`https://webhook.example.com/alerts`) — edit it to a real endpoint before
+relying on delivery. This also needs cluster-admin to have enabled
+user-defined alert routing (`Deploy-Guide-ClusterAdmin.md` Part A8) — if
+they haven't, the AlertmanagerConfig applies without error but is silently
+ignored:
 
 ```bash
 oc apply -f 07-observability/manifests/servicemonitor-account-service.yaml
 oc apply -f 07-observability/manifests/servicemonitor-transaction-service.yaml
 oc apply -f 07-observability/manifests/prometheusrule-financeflow.yaml
+oc apply -f 07-observability/manifests/prometheusrule-deployment-availability.yaml
+oc apply -f 07-observability/manifests/alertmanagerconfig-financeflow.yaml
 ```
 
 **Step 49 — Deploy Tempo and its mTLS/NetworkPolicy exceptions**

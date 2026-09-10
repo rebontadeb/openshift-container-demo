@@ -97,7 +97,21 @@ watch -n10 "oc get pods -n openshift-user-workload-monitoring"
 Wait for `prometheus-user-workload-*` and `thanos-ruler-user-workload-*` to
 show `Running`.
 
-### A8 — Enable the Pipelines console plugin
+### A8 — Enable user-defined alert routing (AlertmanagerConfig)
+
+`enableUserWorkload` (A6) only turns on the Prometheus/Thanos side. Without
+this separate setting, any `AlertmanagerConfig` a student applies (Chapter 7)
+is accepted by the API but silently never takes effect:
+
+```bash
+oc get configmap user-workload-monitoring-config -n openshift-user-workload-monitoring >/dev/null 2>&1 && \
+  oc patch configmap user-workload-monitoring-config -n openshift-user-workload-monitoring \
+    --type=merge -p '{"data":{"config.yaml":"alertmanager:\n  enabled: true\n  enableAlertmanagerConfig: true\n"}}' || \
+  oc create configmap user-workload-monitoring-config -n openshift-user-workload-monitoring \
+    --from-literal=config.yaml=$'alertmanager:\n  enabled: true\n  enableAlertmanagerConfig: true'
+```
+
+### A9 — Enable the Pipelines console plugin
 
 ```bash
 oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}'
@@ -106,7 +120,7 @@ oc patch console.operator.openshift.io cluster --type=json \
   -p '[{"op": "add", "path": "/spec/plugins/-", "value": "pipelines-console-plugin"}]'
 ```
 
-### A9 — Enable the GitOps console plugin
+### A10 — Enable the GitOps console plugin
 
 ```bash
 oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}'
@@ -552,12 +566,19 @@ oc apply -f 07-observability/manifests/grafana/route.yaml
 oc apply -f 07-observability/manifests/grafana/dashboard-service-mesh.yaml
 ```
 
-**Step 48 — Apply ServiceMonitors and the PrometheusRule**
+**Step 48 — Apply ServiceMonitors, PrometheusRules, and alert routing**
+
+`alertmanagerconfig-financeflow.yaml` has a placeholder webhook URL
+(`https://webhook.example.com/alerts`) — edit it to a real endpoint before
+relying on delivery, and confirm Part A8 was applied on this cluster or the
+AlertmanagerConfig will be silently ignored:
 
 ```bash
 oc apply -f 07-observability/manifests/servicemonitor-account-service.yaml
 oc apply -f 07-observability/manifests/servicemonitor-transaction-service.yaml
 oc apply -f 07-observability/manifests/prometheusrule-financeflow.yaml
+oc apply -f 07-observability/manifests/prometheusrule-deployment-availability.yaml
+oc apply -f 07-observability/manifests/alertmanagerconfig-financeflow.yaml
 ```
 
 **Step 49 — Deploy Tempo and its mTLS/NetworkPolicy exceptions**

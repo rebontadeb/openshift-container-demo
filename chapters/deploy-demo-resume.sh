@@ -589,6 +589,9 @@ if step "servicemonitors prometheusrule"; then
   oc apply -f 07-observability/manifests/servicemonitor-account-service.yaml
   oc apply -f 07-observability/manifests/servicemonitor-transaction-service.yaml
   oc apply -f 07-observability/manifests/prometheusrule-financeflow.yaml
+  oc apply -f 07-observability/manifests/prometheusrule-deployment-availability.yaml
+  # Placeholder webhook URL inside — edit before relying on delivery.
+  oc apply -f 07-observability/manifests/alertmanagerconfig-financeflow.yaml
 fi
 
 if step "tempo"; then

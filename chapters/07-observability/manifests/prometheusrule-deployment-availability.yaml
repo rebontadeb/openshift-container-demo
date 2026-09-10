@@ -1,0 +1,30 @@
+# Separate from prometheusrule-financeflow.yaml on purpose: that file carries
+# openshift.io/prometheus-rule-evaluation-scope: leaf-prometheus, which routes
+# evaluation to user-workload Prometheus — the same Prometheus that scrapes
+# account-service/transaction-service's own /metrics via their ServiceMonitors.
+# Portal is plain nginx with no /metrics endpoint and no ServiceMonitor, so it
+# can't be checked with an up{job="portal"} query the way the other two are.
+# kube_deployment_status_replicas_available comes from kube-state-metrics,
+# which only the platform Prometheus (openshift-monitoring) scrapes — so this
+# rule must NOT carry the leaf-prometheus label, or it would silently never
+# evaluate (no data source) instead of erroring visibly.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: financeflow-deployment-availability
+  namespace: myfinance-demo
+  labels:
+    app: financeflow
+spec:
+  groups:
+    - name: financeflow.deployment-availability
+      rules:
+        - alert: AppDeploymentDown
+          expr: |
+            kube_deployment_status_replicas_available{namespace="myfinance-demo", deployment=~"portal|account-service|transaction-service"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.deployment }} has zero available replicas"
+            description: "Deployment {{ $labels.deployment }} in myfinance-demo has had 0 available replicas for 1 minute."

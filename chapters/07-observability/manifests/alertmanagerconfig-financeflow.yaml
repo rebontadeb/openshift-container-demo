@@ -1,0 +1,26 @@
+# Requires enableUserWorkloadAlertmanagerConfig: true in the
+# user-workload-monitoring-config ConfigMap (openshift-user-workload-monitoring)
+# — a separate setting from enableUserWorkload (Deploy-Guide-ClusterAdmin.md
+# Part A6), which only turns on the Prometheus/Thanos side, not user-defined
+# alert routing. Without it this object is accepted but silently ignored.
+apiVersion: monitoring.coreos.com/v1beta1
+kind: AlertmanagerConfig
+metadata:
+  name: financeflow-alerts
+  namespace: myfinance-demo
+  labels:
+    app: financeflow
+spec:
+  route:
+    receiver: financeflow-webhook
+    groupBy: ["alertname", "severity"]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 1h
+  receivers:
+    - name: financeflow-webhook
+      webhookConfigs:
+        # Replace with a real endpoint before relying on this — this URL
+        # does not exist.
+        - url: https://webhook.example.com/alerts
+          sendResolved: true

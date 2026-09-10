@@ -33,6 +33,21 @@ spec:
             summary: "Transaction service has no healthy pods"
             description: "No transaction-service pods have been reachable for 1 minute. Transfers and deposits are blocked."
 
+    - name: financeflow.business
+      rules:
+        - alert: HighValueTransaction
+          expr: |
+            increase(transfer_amount_dollars_bucket{le="+Inf"}[5m])
+            -
+            increase(transfer_amount_dollars_bucket{le="10000"}[5m]) > 0
+          for: 1m
+          labels:
+            severity: warning
+            service: transaction-service
+          annotations:
+            summary: "A transfer over $10,000 was processed"
+            description: "At least one transfer in the last 5 minutes exceeded the $10,000 bucket boundary. Review transaction-service logs for the reference number."
+
     - name: financeflow.errors
       rules:
         - alert: HighTransferErrorRate
