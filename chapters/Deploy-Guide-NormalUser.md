@@ -458,8 +458,8 @@ oc apply -f 06-cicd/manifests/argocd-app-financeflow.yaml -n openshift-gitops
 ARGOCD_WEBHOOK_SECRET=$(oc get secret github-webhook-secret -n "$NAMESPACE" -o jsonpath='{.data.secret}' | base64 -d)
 oc patch secret argocd-secret -n openshift-gitops --type=merge \
   -p "{\"stringData\":{\"webhook.github.secret\":\"$ARGOCD_WEBHOOK_SECRET\"}}"
-oc rollout restart deployment/argocd-server -n openshift-gitops
-oc rollout status deployment/argocd-server -n openshift-gitops --timeout=120s
+oc rollout restart deployment/openshift-gitops-server -n openshift-gitops
+oc rollout status deployment/openshift-gitops-server -n openshift-gitops --timeout=120s
 echo "ArgoCD: https://$(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}')"
 echo "ArgoCD admin password: $(oc extract secret/openshift-gitops-cluster -n openshift-gitops --to=- --keys=admin.password)"
 echo "ArgoCD webhook payload URL: https://$(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}')/api/webhook"

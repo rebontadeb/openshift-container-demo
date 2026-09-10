@@ -531,8 +531,8 @@ if step "argocd appproject application"; then
   if [ -n "$ARGOCD_WEBHOOK_SECRET" ]; then
     oc patch secret argocd-secret -n openshift-gitops --type=merge \
       -p "{\"stringData\":{\"webhook.github.secret\":\"$ARGOCD_WEBHOOK_SECRET\"}}"
-    oc rollout restart deployment/argocd-server -n openshift-gitops
-    oc rollout status deployment/argocd-server -n openshift-gitops --timeout=120s
+    oc rollout restart deployment/openshift-gitops-server -n openshift-gitops
+    oc rollout status deployment/openshift-gitops-server -n openshift-gitops --timeout=120s
   else
     echo "    ⚠ github-webhook-secret not found — run Step 34 first, then re-run this step to enable ArgoCD's webhook."
   fi
