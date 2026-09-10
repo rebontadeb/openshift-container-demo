@@ -17,11 +17,13 @@
 # matching the ask for a throwaway, non-persistent VM (the seed data is
 # re-applied by cloud-init on every boot, same as a fresh container would be).
 #
-# cloud-init userdata (schema + seed SQL) is passed via userDataSecretRef,
-# not inlined under cloudInitNoCloud.userData — KubeVirt's admission webhook
-# caps inline userData at 2048 bytes, and this payload is well past that.
-# A Secret has no such limit. The Secret key must be exactly "userdata"
-# (KubeVirt's own convention for CloudInitNoCloudSource.userDataSecretRef).
+# cloud-init userdata (schema + seed SQL) is passed via cloudInitNoCloud's
+# secretRef field, not inlined under cloudInitNoCloud.userData — KubeVirt's
+# admission webhook caps inline userData at 2048 bytes, and this payload is
+# well past that. A Secret has no such limit. The YAML key is "secretRef"
+# (not "userDataSecretRef" — an asymmetric legacy naming quirk in
+# CloudInitNoCloudSource; only NetworkDataSecretRef's key actually matches
+# its Go field name). The Secret's own key must be exactly "userdata".
 #
 # VM OS login: user "demo" / password "demo123" (set via cloud-config below,
 # ssh_pwauth enabled) — throwaway demo credentials for console/SSH access to
@@ -206,7 +208,7 @@ spec:
             secretName: postgres-credentials
         - name: cloudinitdisk
           cloudInitNoCloud:
-            userDataSecretRef:
+            secretRef:
               name: postgres-vm-cloudinit
 ---
 # Direct/standalone access to the VM, independent of the container
