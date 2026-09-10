@@ -150,6 +150,11 @@ stringData:
       - su -c "psql -c \"CREATE USER \\\"$PG_DB_USER\\\" WITH PASSWORD '$PG_DB_PASSWORD';\"" postgres
       - su -c "psql -c \"CREATE DATABASE \\\"$PG_DB_NAME\\\" OWNER \\\"$PG_DB_USER\\\";\"" postgres
       - su -c "psql -d $PG_DB_NAME -f /tmp/init.sql" postgres
+      # init.sql ran as the postgres superuser, so it owns every table —
+      # $PG_DB_USER owns the *database* (from CREATE DATABASE ... OWNER),
+      # but that doesn't grant rights on tables it didn't create. Without
+      # this, every app query fails with "permission denied for table ...".
+      - su -c "psql -d $PG_DB_NAME -c \"GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \\\"$PG_DB_USER\\\"; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \\\"$PG_DB_USER\\\";\"" postgres
       - firewall-cmd --permanent --add-port=5432/tcp --zone=public || true
       - firewall-cmd --reload || true
 ---
@@ -170,15 +175,16 @@ spec:
         tier: database
         kubevirt.io/domain: postgres-vm
       annotations:
-        # Namespace has istio-injection enabled (Chapter 5) — the VM's pod
-        # gets an Envoy sidecar like any other pod. Envoy's iptables
-        # interception fights KubeVirt's own masquerade DNAT for the VM's
-        # network, since the actual TCP listener (Postgres) lives inside the
-        # guest VM, not in the pod's netns the way a normal container's
-        # process would. Excluding port 5432 from interception lets it pass
-        # straight through to the VM untouched, while keeping the pod in the
-        # mesh for everything else.
-        traffic.sidecar.istio.io/excludeInboundPorts: "5432"
+        # Opts the virt-launcher pod out of sidecar injection entirely.
+        # A VM's actual app (Postgres) runs inside the guest OS, one
+        # network namespace deeper than the pod — a sidecar's mTLS
+        # terminate-then-loopback-forward handoff can't reach it there,
+        # so a half-injected sidecar just breaks connectivity for no
+        # benefit. With no sidecar at all, Istio correctly treats this
+        # endpoint as non-mesh and clients send it plain TCP directly —
+        # no DestinationRule override needed, and it doesn't affect mTLS
+        # for the containerized postgres backend when that's live instead.
+        sidecar.istio.io/inject: "false"
     spec:
       domain:
         cpu:
