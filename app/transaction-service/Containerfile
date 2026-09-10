@@ -14,4 +14,11 @@ USER 1001
 
 EXPOSE 8080
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "30", "app:app"]
+# Single worker (with threads for concurrency) so prometheus_client's
+# in-memory Histogram/Counter registry is shared across every request —
+# with 2+ workers, each is a separate process with its own registry, and
+# whichever worker happens to serve the /metrics scrape won't see
+# observations recorded by a different worker. No multiprocess mode is
+# configured (no PROMETHEUS_MULTIPROC_DIR / MultiProcessCollector), so
+# multi-worker here means metrics are unreliable, not just imprecise.
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4", "--timeout", "30", "app:app"]

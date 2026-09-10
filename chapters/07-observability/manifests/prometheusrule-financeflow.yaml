@@ -36,10 +36,13 @@ spec:
     - name: financeflow.business
       rules:
         - alert: HighValueTransaction
+          # le is a string label — prometheus_client formats numeric bucket
+          # bounds as floats ("10000.0", not "10000"), so this must match
+          # that exact string or the query silently matches zero series.
           expr: |
             increase(transfer_amount_dollars_bucket{le="+Inf"}[5m])
             -
-            increase(transfer_amount_dollars_bucket{le="10000"}[5m]) > 0
+            increase(transfer_amount_dollars_bucket{le="10000.0"}[5m]) > 0
           for: 1m
           labels:
             severity: warning

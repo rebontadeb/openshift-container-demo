@@ -14,4 +14,8 @@ USER 1001
 
 EXPOSE 8080
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "30", "app:app"]
+# Single worker (with threads for concurrency) — see transaction-service's
+# Containerfile for why: prometheus_client's in-memory registry isn't
+# shared across gunicorn workers without multiprocess mode, which isn't
+# configured here.
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4", "--timeout", "30", "app:app"]
