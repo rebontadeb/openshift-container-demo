@@ -446,14 +446,28 @@ oc apply -f 06-cicd/manifests/peerauthentication-webhook-ingress-permissive.yaml
 **Step 39 — Apply the ArgoCD AppProject and Application**
 
 These go into ArgoCD's own namespace, `openshift-gitops` — this may need
-cluster-admin help if you don't have write access there:
+cluster-admin help if you don't have write access there. This step also
+wires up ArgoCD's own webhook receiver (reusing Step 34's
+`github-webhook-secret` value) — without it, ArgoCD only notices new
+commits on its default 3-minute poll, since the Step 34/38 webhook only
+tells the *pipeline* about a push, not ArgoCD:
 
 ```bash
 oc apply -f 06-cicd/manifests/argocd-project.yaml -n openshift-gitops
 oc apply -f 06-cicd/manifests/argocd-app-financeflow.yaml -n openshift-gitops
+ARGOCD_WEBHOOK_SECRET=$(oc get secret github-webhook-secret -n "$NAMESPACE" -o jsonpath='{.data.secret}' | base64 -d)
+oc patch secret argocd-secret -n openshift-gitops --type=merge \
+  -p "{\"stringData\":{\"webhook.github.secret\":\"$ARGOCD_WEBHOOK_SECRET\"}}"
+oc rollout restart deployment/argocd-server -n openshift-gitops
+oc rollout status deployment/argocd-server -n openshift-gitops --timeout=120s
 echo "ArgoCD: https://$(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}')"
 echo "ArgoCD admin password: $(oc extract secret/openshift-gitops-cluster -n openshift-gitops --to=- --keys=admin.password)"
+echo "ArgoCD webhook payload URL: https://$(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}')/api/webhook"
 ```
+
+Register a **second** webhook in GitHub/Gitea (repo → Settings → Webhooks)
+pointing at that payload URL, using the **same secret** as Step 34's
+webhook, event `push` only. Two webhooks, one secret, one repo.
 
 **Step 40 — Trigger a manual PipelineRun for account-service**
 
@@ -589,11 +603,16 @@ echo "Jaeger UI: https://$(oc get route tempo-financeflow-jaegerui -n "$NAMESPAC
 echo "ArgoCD:    https://$(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}')"
 ```
 
-If you completed Chapter 6, finish wiring the webhook loop:
+If you completed Chapter 6, finish wiring the webhook loop — two separate
+webhooks, same secret, one repo:
 
-1. Register the GitHub webhook (repo → Settings → Webhooks) with the URL
+1. Register the pipeline webhook (repo → Settings → Webhooks) with the URL
    from Step 38 and the secret from Step 34, event `push` only.
-2. `05-service-mesh/manifests/kiali.yaml`'s Grafana URL is hardcoded to
+2. Register a second webhook with the payload URL from Step 39 (ArgoCD's
+   `/api/webhook`), same secret, event `push` only — without this, ArgoCD
+   only picks up new commits on its default 3-minute poll instead of
+   immediately on push.
+3. `05-service-mesh/manifests/kiali.yaml`'s Grafana URL is hardcoded to
    whatever cluster it was last edited on — update it to match your Grafana
    route from Step 47 if it doesn't match.
 

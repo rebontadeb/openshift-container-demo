@@ -522,8 +522,24 @@ fi
 if step "argocd appproject application"; then
   oc apply -f 06-cicd/manifests/argocd-project.yaml -n openshift-gitops
   oc apply -f 06-cicd/manifests/argocd-app-financeflow.yaml -n openshift-gitops
+  # Reuse Step 34's github-webhook-secret value for ArgoCD's own webhook
+  # receiver too — one secret, registered as two separate webhooks in
+  # GitHub/Gitea (this one and Step 38's Tekton EventListener). Without
+  # this, ArgoCD only ever finds new commits on its default 3-minute poll;
+  # a webhook is what makes it react to a push immediately instead.
+  ARGOCD_WEBHOOK_SECRET=$(oc get secret github-webhook-secret -n "$NAMESPACE" -o jsonpath='{.data.secret}' 2>/dev/null | base64 -d)
+  if [ -n "$ARGOCD_WEBHOOK_SECRET" ]; then
+    oc patch secret argocd-secret -n openshift-gitops --type=merge \
+      -p "{\"stringData\":{\"webhook.github.secret\":\"$ARGOCD_WEBHOOK_SECRET\"}}"
+    oc rollout restart deployment/argocd-server -n openshift-gitops
+    oc rollout status deployment/argocd-server -n openshift-gitops --timeout=120s
+  else
+    echo "    ⚠ github-webhook-secret not found — run Step 34 first, then re-run this step to enable ArgoCD's webhook."
+  fi
   echo "    ArgoCD: https://$(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}' 2>/dev/null)"
   echo "    ArgoCD admin password: $(oc extract secret/openshift-gitops-cluster -n openshift-gitops --to=- --keys=admin.password 2>/dev/null)"
+  echo "    ArgoCD webhook (register in GitHub/Gitea alongside Step 34's, same secret):"
+  echo "      Payload URL: https://$(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}' 2>/dev/null)/api/webhook"
 fi
 
 if step "manual pipelinerun account"; then
@@ -628,12 +644,17 @@ if step "summary"; then
   echo " ArgoCD:    https://$(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}' 2>/dev/null)"
   echo "   ArgoCD admin password: $(oc extract secret/openshift-gitops-cluster -n openshift-gitops --to=- --keys=admin.password 2>/dev/null)"
   echo
-  echo " Still needed for the full CI/CD webhook loop:"
-  echo "   1. Register the GitHub webhook (Settings → Webhooks) on your repo:"
+  echo " Still needed for the full CI/CD webhook loop — TWO webhooks, same secret:"
+  echo "   1. Register the pipeline webhook (Settings → Webhooks) on your repo:"
   echo "      Payload URL: https://$(oc get route financeflow-webhook -n "$NAMESPACE" -o jsonpath='{.spec.host}' 2>/dev/null)"
   echo "      Secret:      $(oc get secret github-webhook-secret -n "$NAMESPACE" -o jsonpath='{.data.secret}' 2>/dev/null | base64 -d)"
   echo "      Events:      just 'push'"
-  echo "   2. chapters/05-service-mesh/manifests/kiali.yaml's Grafana URL is hardcoded to"
+  echo "   2. Register a SECOND webhook, same secret, so ArgoCD syncs on push"
+  echo "      instead of waiting on its default 3-minute poll:"
+  echo "      Payload URL: https://$(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}' 2>/dev/null)/api/webhook"
+  echo "      Secret:      (same as above)"
+  echo "      Events:      just 'push'"
+  echo "   3. chapters/05-service-mesh/manifests/kiali.yaml's Grafana URL is hardcoded to"
   echo "      whatever cluster it was last edited on — update it to match the Grafana"
   echo "      route printed above if it doesn't match."
   echo "════════════════════════════════════════════════════════════════════"
