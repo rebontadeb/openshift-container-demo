@@ -20,7 +20,8 @@ spec:
   receivers:
     - name: financeflow-webhook
       webhookConfigs:
-        # Replace with a real endpoint before relying on this — this URL
-        # does not exist.
-        - url: https://webhook.example.com/alerts
+        # Must be https:// — the route is edge-terminated with no plain-HTTP
+        # fallback, so http:// gets a 503 from the router itself before it
+        # even reaches the pod.
+        - url: https://webhook-server-myfinance-demo.apps.cluster-7tfd6.dyn.redhatworkshops.io/hook/ocp-alerts
           sendResolved: true
