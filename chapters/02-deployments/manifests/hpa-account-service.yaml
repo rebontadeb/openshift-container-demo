@@ -11,8 +11,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: account-service
-  minReplicas: 2    # never below 2 — financial service must stay available
-  maxReplicas: 3
+  minReplicas: 1    # never below 2 — financial service must stay available
+  maxReplicas: 2
   metrics:
     - type: Resource
       resource:

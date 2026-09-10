@@ -212,7 +212,7 @@ spec:
       volumes:
         - name: rootdisk
           containerDisk:
-            image: registry.redhat.io/rhel9/rhel-guest-image:latest
+            image: quay.io/containerdisks/fedora:latest 
         - name: postgrescreds
           secret:
             secretName: postgres-credentials
