@@ -14,9 +14,9 @@ spec:
   route:
     receiver: financeflow-webhook
     groupBy: ["alertname", "severity"]
-    groupWait: 30s
+    groupWait: 5s
     groupInterval: 5m
-    repeatInterval: 1h
+    repeatInterval: 5m
   receivers:
     - name: financeflow-webhook
       webhookConfigs:
