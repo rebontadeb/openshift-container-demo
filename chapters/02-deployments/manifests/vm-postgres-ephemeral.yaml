@@ -169,6 +169,16 @@ spec:
         app: financeflow
         tier: database
         kubevirt.io/domain: postgres-vm
+      annotations:
+        # Namespace has istio-injection enabled (Chapter 5) — the VM's pod
+        # gets an Envoy sidecar like any other pod. Envoy's iptables
+        # interception fights KubeVirt's own masquerade DNAT for the VM's
+        # network, since the actual TCP listener (Postgres) lives inside the
+        # guest VM, not in the pod's netns the way a normal container's
+        # process would. Excluding port 5432 from interception lets it pass
+        # straight through to the VM untouched, while keeping the pod in the
+        # mesh for everything else.
+        traffic.sidecar.istio.io/excludeInboundPorts: "5432"
     spec:
       domain:
         cpu:
