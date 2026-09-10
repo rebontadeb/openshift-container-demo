@@ -8,7 +8,7 @@ from urllib.parse import quote_plus
 from flask import Flask, jsonify, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, CollectorRegistry, multiprocess, generate_latest, CONTENT_TYPE_LATEST
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -161,6 +161,15 @@ def readiness():
 
 @app.route("/metrics")
 def metrics():
+    # PROMETHEUS_MULTIPROC_DIR set (gunicorn runs multiple workers, see
+    # Containerfile/gunicorn.conf.py) — merge every worker's per-process
+    # metrics instead of returning just this worker's own, otherwise
+    # whichever worker happens to serve this request would silently omit
+    # everything the other workers recorded.
+    if "PROMETHEUS_MULTIPROC_DIR" in os.environ:
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return generate_latest(registry), 200, {"Content-Type": CONTENT_TYPE_LATEST}
     return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
 
 # ─── Transactions API ─────────────────────────────────────────────────────────

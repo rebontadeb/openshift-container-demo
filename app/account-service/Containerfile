@@ -9,13 +9,15 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py .
+COPY gunicorn.conf.py .
+
+# PROMETHEUS_MULTIPROC_DIR + gunicorn.conf.py's on_starting/child_exit hooks
+# put prometheus_client into multiprocess mode — see transaction-service's
+# Containerfile for the full explanation.
+ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
 
 USER 1001
 
 EXPOSE 8080
 
-# Single worker (with threads for concurrency) — see transaction-service's
-# Containerfile for why: prometheus_client's in-memory registry isn't
-# shared across gunicorn workers without multiprocess mode, which isn't
-# configured here.
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4", "--timeout", "30", "app:app"]
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "30", "app:app"]

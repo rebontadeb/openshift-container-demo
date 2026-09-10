@@ -7,7 +7,7 @@ from urllib.parse import quote_plus
 from flask import Flask, jsonify, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, multiprocess, generate_latest, CONTENT_TYPE_LATEST
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -77,6 +77,12 @@ ACCOUNT_BALANCE = Gauge(
     "account_balance_dollars",
     "Current account balance in USD",
     ["account_id", "account_type"],
+    # Default multiprocess mode ("all") exposes each worker's value as a
+    # separate series keyed by pid — wrong for a snapshot value like this,
+    # since only whichever worker most recently refreshed it (on a /metrics
+    # hit, see below) has a current number. "mostrecent" picks the
+    # freshest value across workers instead of showing all of them.
+    multiprocess_mode="mostrecent",
 )
 
 # ─── Model ────────────────────────────────────────────────────────────────────
@@ -138,6 +144,15 @@ def metrics():
             ).set(float(acct.balance))
     except Exception:
         pass
+    # PROMETHEUS_MULTIPROC_DIR set (gunicorn runs multiple workers, see
+    # Containerfile/gunicorn.conf.py) — merge every worker's per-process
+    # metrics instead of returning just this worker's own, otherwise
+    # whichever worker happens to serve this request would silently omit
+    # everything the other workers recorded.
+    if "PROMETHEUS_MULTIPROC_DIR" in os.environ:
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return generate_latest(registry), 200, {"Content-Type": CONTENT_TYPE_LATEST}
     return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
 
 # ─── Accounts API ─────────────────────────────────────────────────────────────

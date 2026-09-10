@@ -9,16 +9,19 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py .
+COPY gunicorn.conf.py .
+
+# PROMETHEUS_MULTIPROC_DIR + gunicorn.conf.py's on_starting/child_exit hooks
+# put prometheus_client into multiprocess mode — each of the 2 workers
+# writes its metrics to per-process mmap files here instead of an
+# in-memory registry, and /metrics (app.py) merges them all via
+# MultiProcessCollector. Without this, each worker has its own invisible
+# registry and whichever one serves a given /metrics scrape misses every
+# observation recorded by the other worker.
+ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
 
 USER 1001
 
 EXPOSE 8080
 
-# Single worker (with threads for concurrency) so prometheus_client's
-# in-memory Histogram/Counter registry is shared across every request —
-# with 2+ workers, each is a separate process with its own registry, and
-# whichever worker happens to serve the /metrics scrape won't see
-# observations recorded by a different worker. No multiprocess mode is
-# configured (no PROMETHEUS_MULTIPROC_DIR / MultiProcessCollector), so
-# multi-worker here means metrics are unreliable, not just imprecise.
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4", "--timeout", "30", "app:app"]
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "30", "app:app"]
