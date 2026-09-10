@@ -39,9 +39,13 @@ spec:
           # le is a string label — prometheus_client formats numeric bucket
           # bounds as floats ("10000.0", not "10000"), so this must match
           # that exact string or the query silently matches zero series.
+          # `ignoring(le)` is required too: PromQL's binary operators match
+          # on ALL labels by default, and these two sides deliberately
+          # differ on `le` — without ignoring it, nothing pairs up and the
+          # whole expression returns empty, not false.
           expr: |
             increase(transfer_amount_dollars_bucket{le="+Inf"}[5m])
-            -
+            - ignoring(le)
             increase(transfer_amount_dollars_bucket{le="10000.0"}[5m]) > 0
           for: 1m
           labels:
